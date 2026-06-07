@@ -8,6 +8,17 @@ smaller AND verified playable**, then safely removing the original. A Windows de
 
 ## Status
 - [x] Scaffold + Fluent shell
-- [ ] Core engine (probe / classify / verify / safe-replace)
+- [x] Core probe/classify scan API
+- [ ] Core engine (verify / safe-replace)
 - [ ] UI wiring + live progress
 - [ ] Embedded poster thumbnails
+
+## Non-Destructive Probe Scan
+
+M2 includes a console harness that reads a folder, probes videos with `ffprobe`, and prints
+candidate classifications. It does not encode, replace, or delete files.
+
+```bash
+dotnet run --project src/VideoTriage.Cli -- "D:\Videos\Captures"
+dotnet run --project src/VideoTriage.Cli -- "D:\Videos\Captures" --recursive
+```
