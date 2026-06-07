@@ -53,6 +53,19 @@ public sealed class VideoStatsTests
         stats.BitsPerPixel.ShouldBe(0);
     }
 
+    [Fact]
+    public void BitsPerPixel_LargeDimensions_DoesNotOverflow()
+    {
+        var stats = CreateStats(videoBitrate: 5_000_000_000, containerBitrate: null) with
+        {
+            Width = 50_000,
+            Height = 50_000,
+            FramesPerSecond = 2
+        };
+
+        stats.BitsPerPixel.ShouldBe(5_000_000_000d / (50_000d * 50_000 * 2), tolerance: 0.000001);
+    }
+
     private static VideoStats CreateStats(long? videoBitrate, long? containerBitrate) =>
         new()
         {

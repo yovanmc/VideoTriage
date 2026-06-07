@@ -22,6 +22,6 @@ public sealed record VideoStats
 
     public double BitsPerPixel =>
         Width > 0 && Height > 0 && FramesPerSecond > 0 && EffectiveBitrateBitsPerSecond > 0
-            ? EffectiveBitrateBitsPerSecond / (Width * Height * FramesPerSecond)
+            ? EffectiveBitrateBitsPerSecond / ((double)Width * Height * FramesPerSecond)
             : 0;
 }
