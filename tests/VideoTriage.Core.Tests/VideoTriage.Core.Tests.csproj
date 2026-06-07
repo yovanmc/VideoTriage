@@ -23,4 +23,8 @@
     <ProjectReference Include="..\..\src\VideoTriage.Core\VideoTriage.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="TestData\**\*.*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
