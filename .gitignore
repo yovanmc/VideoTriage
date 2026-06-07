@@ -10,6 +10,7 @@ artifacts/
 TestResults/
 *.binlog
 *.log
+.worktrees/
 
 ## Rider/VS
 .idea/
