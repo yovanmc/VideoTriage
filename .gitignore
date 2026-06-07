@@ -9,6 +9,7 @@ obj/
 artifacts/
 TestResults/
 *.binlog
+*.log
 
 ## Rider/VS
 .idea/
