@@ -4,7 +4,7 @@ Batch-compress a folder of videos to AV1 (NVEnc), keeping a new encode **only wh
 smaller AND verified playable**, then safely removing the original. A Windows desktop app
 (WPF + Fluent) built on an engine calibrated on 1,700+ real files.
 
-> 🚧 Early development. See `docs/superpowers/plans/` for the build plan.
+> **[WIP]** Early development. See `docs/superpowers/plans/` for the build plan.
 
 ## Status
 - [x] Scaffold + Fluent shell
