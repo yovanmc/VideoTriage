@@ -14,7 +14,8 @@
 
 This plan owns tool discovery, the App test project, dependency registration, and WPF host lifetime.
 It does not implement queue UI or run commands. It assumes verification, encoding, replacement,
-pipeline, state, and poster plans have been integrated into updated `main`.
+pipeline, and state plans have been integrated into updated `main`. Poster embedding is a later
+milestone and will extend the pipeline registration after its own implementation is integrated.
 
 **Working directory for every command:** `C:\Agent Projects\VideoTriage`
 
@@ -350,7 +351,7 @@ public sealed class ServiceCollectionExtensionsTests
         var services = new ServiceCollection();
         services.AddSingleton<IToolLocator>(new FakeLocator(allAvailable: true));
 
-        services.AddVideoTriageForTests(Path.GetTempPath());
+        services.AddVideoTriageForTests();
         using var provider = services.BuildServiceProvider();
 
         provider.GetRequiredService<IPrerequisiteService>().ShouldBeOfType<PrerequisiteService>();
@@ -364,7 +365,7 @@ public sealed class ServiceCollectionExtensionsTests
         var services = new ServiceCollection();
         services.AddSingleton<IToolLocator>(new FakeLocator(allAvailable: false));
 
-        services.AddVideoTriageForTests(Path.GetTempPath());
+        services.AddVideoTriageForTests();
         using var provider = services.BuildServiceProvider();
 
         provider.GetRequiredService<ITriagePipelineProvider>().Pipeline.ShouldBeNull();
@@ -404,7 +405,6 @@ using VideoTriage.App.Views;
 using VideoTriage.Core.Encoding;
 using VideoTriage.Core.FileSystem;
 using VideoTriage.Core.Pipeline;
-using VideoTriage.Core.Poster;
 using VideoTriage.Core.Probing;
 using VideoTriage.Core.Replace;
 using VideoTriage.Core.State;
@@ -460,7 +460,6 @@ public static class ServiceCollectionExtensions
                 runner,
                 Path.Combine(AppContext.BaseDirectory, "Encoding", "Assets", "videotriage-av1.json"),
                 "VideoTriage AV1");
-            var poster = new PosterEmbedder(paths["ffmpeg"], runner, verifier);
             ITriagePipeline pipeline = new TriagePipeline(
                 sp.GetRequiredService<IVideoFileDiscovery>(),
                 ffprobe,
@@ -471,8 +470,7 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<IFileSystem>(),
                 sp.GetRequiredService<Func<string, ICompletedFileStore>>(),
                 sp.GetRequiredService<Func<string, IDeleteManifest>>(),
-                sp.GetRequiredService<Func<string, IResultLog>>(),
-                poster);
+                sp.GetRequiredService<Func<string, IResultLog>>());
             return new TriagePipelineProvider(pipeline);
         });
         services.AddSingleton<MainWindow>();
@@ -612,10 +610,11 @@ Expected: commit succeeds.
 - No task contains TBD, TODO, “implement later,” or an unspecified test.
 - All production files have complete code.
 - Constructor calls match the architecture contract; `TriagePipeline` is resolved by DI from the
-  constructor established by the integrated pipeline/state/poster plans.
+  constructor established by the integrated pipeline/state plans. The later poster milestone
+  extends this registration when poster support is added to the pipeline.
 
 ## Execution Handoff
 
-Execute on `feature/prerequisites-composition` from updated `main` after the Core pipeline, state,
-and poster branches are integrated. Use `superpowers:subagent-driven-development` task-by-task and
+Execute on `feature/prerequisites-composition` from updated `main` after the Core pipeline and state
+branches are integrated. Use `superpowers:subagent-driven-development` task-by-task and
 require specification plus code-quality review before merging.

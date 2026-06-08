@@ -7,6 +7,14 @@ namespace VideoTriage.Core.Tests.Tools;
 public sealed class ToolLocatorTests
 {
     [Fact]
+    public void ToolLocator_ImplementsIToolLocator()
+    {
+        IToolLocator locator = new ToolLocator(string.Empty);
+
+        locator.FindOnPath("ffmpeg").ShouldBeNull();
+    }
+
+    [Fact]
     public void FindOnPath_FindsExecutableInInjectedPath()
     {
         using var temp = new TempDirectory();
@@ -50,6 +58,19 @@ public sealed class ToolLocatorTests
 
         exception.Message.ShouldContain("ffprobe");
         exception.Message.ShouldContain("PATH");
+    }
+
+    [Fact]
+    public void RequireOnPath_UsesGenericInstallHint()
+    {
+        using var temp = new TempDirectory();
+
+        var exception = Should.Throw<FileNotFoundException>(() =>
+            new ToolLocator(pathOverride: temp.Path).RequireOnPath("HandBrakeCLI"));
+
+        exception.Message.ShouldContain("HandBrakeCLI");
+        exception.Message.ShouldContain("Install it");
+        exception.Message.ShouldNotContain("ffmpeg");
     }
 
     private sealed class TempDirectory : IDisposable
