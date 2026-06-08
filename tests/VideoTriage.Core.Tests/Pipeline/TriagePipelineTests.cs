@@ -5,6 +5,7 @@ using VideoTriage.Core.Models;
 using VideoTriage.Core.Pipeline;
 using VideoTriage.Core.Probing;
 using VideoTriage.Core.Replace;
+using VideoTriage.Core.State;
 using VideoTriage.Core.Verify;
 
 namespace VideoTriage.Core.Tests.Pipeline;
@@ -145,6 +146,21 @@ public sealed class TriagePipelineTests
     }
 
     [Fact]
+    public async Task RunAsync_ReplaceFailure_CleansTempAndCountsFailed()
+    {
+        var fakes = PipelineFakes.Candidate();
+        fakes.ReplaceOutcome = ReplaceOutcome.Failed;
+
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+
+        result.Failed.ShouldBe(1);
+        result.Replaced.ShouldBe(0);
+        fakes.Calls.ShouldBe(
+            ["discover", "probe", "classify", "space", "encode", "verify", "replace", "delete-temp"]);
+        fakes.OriginalRemoved.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task RunAsync_Cancelled_ThrowsAndLeavesOriginalUntouched()
     {
         var fakes = PipelineFakes.Candidate();
@@ -186,7 +202,10 @@ public sealed class TriagePipelineTests
                 new FakeEncoder(this),
                 new FakeVerifier(this),
                 new FakeReplacer(this),
-                new FakeFileSystem(this));
+                new FakeFileSystem(this),
+                _ => new NoOpCompletedStore(),
+                _ => new NoOpDeleteManifest(),
+                _ => new NoOpResultLog());
         }
 
         public static PipelineFakes Candidate() => new();
@@ -267,7 +286,8 @@ public sealed class TriagePipelineTests
             public ReplaceResult Replace(string originalPath, string verifiedReplacementPath, DeleteMode deleteMode)
             {
                 f.Calls.Add("replace");
-                f.MarkOriginalRemoved();
+                if (f.ReplaceOutcome is not ReplaceOutcome.Failed)
+                    f.MarkOriginalRemoved();
                 return new ReplaceResult
                 {
                     Outcome = f.ReplaceOutcome,
@@ -275,7 +295,7 @@ public sealed class TriagePipelineTests
                         ? TempFileNaming.PartialPath(originalPath, 1)
                         : Path.ChangeExtension(originalPath, ".mp4"),
                     Reason = "replaced",
-                    OriginalRemoved = true
+                    OriginalRemoved = f.ReplaceOutcome is not ReplaceOutcome.Failed
                 };
             }
         }
@@ -294,6 +314,22 @@ public sealed class TriagePipelineTests
                 return f.AvailableBytes;
             }
             public DateTimeOffset GetLastWriteTimeUtc(string path) => DateTimeOffset.UnixEpoch;
+        }
+
+        private sealed class NoOpCompletedStore : ICompletedFileStore
+        {
+            public IReadOnlyList<CompletedFileEntry> Load() => [];
+            public void Append(CompletedFileEntry entry) { }
+        }
+
+        private sealed class NoOpDeleteManifest : IDeleteManifest
+        {
+            public void Append(DeleteManifestEntry entry) { }
+        }
+
+        private sealed class NoOpResultLog : IResultLog
+        {
+            public void Append(ResultLogEntry entry) { }
         }
     }
 }

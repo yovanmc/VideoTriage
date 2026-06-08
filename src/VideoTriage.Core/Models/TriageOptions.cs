@@ -26,4 +26,7 @@ public sealed record TriageOptions
     public double MinimumFreeGigabytes { get; init; } = 5;
     public double MarginalThresholdPercent { get; init; } = 10;
     public bool DryRun { get; init; }
+
+    // M5 state: per-folder data directory co-located with the scanned videos.
+    public string DataDirectoryName { get; init; } = "_videotriage_data";
 }
