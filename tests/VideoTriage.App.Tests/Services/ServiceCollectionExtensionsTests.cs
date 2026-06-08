@@ -61,8 +61,11 @@ public sealed class ServiceCollectionExtensionsTests
         services.AddVideoTriageForTests();
         using var provider = services.BuildServiceProvider();
 
-        provider.GetRequiredService<MainViewModel>()
-            .ChooseFolderCommand.CanExecute(null).ShouldBeTrue();
+        var viewModel = provider.GetRequiredService<MainViewModel>();
+
+        viewModel.ChooseFolderCommand.CanExecute(null).ShouldBeTrue();
+        viewModel.SelectedFolder = @"C:\Videos";
+        viewModel.StartCommand.CanExecute(null).ShouldBeTrue();
     }
 
     [Fact]
