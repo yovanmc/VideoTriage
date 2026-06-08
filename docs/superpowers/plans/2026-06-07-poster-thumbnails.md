@@ -15,6 +15,22 @@
 Poster failure never blocks a valid encode from being saved. Poster embedding does not touch the
 original source and does not replace files by itself.
 
+## Execution Corrections
+
+These corrections are authoritative where Task 4 snippets differ from current `main`:
+
+- Task 4 also modifies `src/VideoTriage.App/Services/ServiceCollectionExtensions.cs` and its
+  composition tests. Construct `PosterEmbedder` from the available ffmpeg path, process runner, and
+  verifier, then pass it to `TriagePipeline`. Without this wiring, the default-enabled poster option
+  would be silently ignored in production.
+- Keep a `replacementPath` variable for the verified candidate chosen after poster embedding. Every
+  size check, saved-percent calculation, replacement call, and replacement-failure cleanup must use
+  this path.
+- If `ISafeReplacer.Replace` returns failure, delete `replacementPath` when it still exists. If a
+  poster mux was produced, also delete the now-redundant original encode temp. Do not clean up only
+  `encodePath`, which would leak the muxed candidate.
+- Existing pipeline tests may omit the optional `IPosterEmbedder`; production composition must not.
+
 ## File Structure
 
 ```text
@@ -25,11 +41,13 @@ src/VideoTriage.Core/
   Poster/IPosterEmbedder.cs
   Poster/PosterEmbedder.cs
   Pipeline/TriagePipeline.cs
+src/VideoTriage.App/Services/ServiceCollectionExtensions.cs
 tests/VideoTriage.Core.Tests/
   Models/TriageOptionsPosterTests.cs
   Poster/PosterArgumentsTests.cs
   Poster/PosterEmbedderTests.cs
   Pipeline/TriagePipelinePosterTests.cs
+tests/VideoTriage.App.Tests/Services/ServiceCollectionExtensionsTests.cs
 ```
 
 ### Task 1: Poster Options
