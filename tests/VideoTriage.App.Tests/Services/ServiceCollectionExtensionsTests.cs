@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using VideoTriage.App.Services;
+using VideoTriage.App.Tests.Fakes;
+using VideoTriage.App.ViewModels;
 using VideoTriage.Core.Pipeline;
 using VideoTriage.Core.Tools;
 
@@ -47,10 +49,51 @@ public sealed class ServiceCollectionExtensionsTests
             .Any(x => !x.IsAvailable).ShouldBeTrue();
     }
 
+    [Fact]
+    public void AddVideoTriage_FfprobeAvailable_RegistersScannableMainViewModel()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IToolLocator>(new FakeLocator(allAvailable: true));
+        services.AddSingleton<IDialogService>(new FakeDialogService());
+        services.AddSingleton<IUiDispatcher>(new RecordingUiDispatcher());
+
+        services.AddVideoTriageForTests();
+        using var provider = services.BuildServiceProvider();
+
+        provider.GetRequiredService<MainViewModel>()
+            .ChooseFolderCommand.CanExecute(null).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void AddVideoTriage_FfprobeMissing_StillRegistersMainViewModel()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IToolLocator>(new MissingFfprobeLocator());
+        services.AddSingleton<IDialogService>(new FakeDialogService());
+        services.AddSingleton<IUiDispatcher>(new RecordingUiDispatcher());
+
+        services.AddVideoTriageForTests();
+        using var provider = services.BuildServiceProvider();
+
+        var viewModel = provider.GetRequiredService<MainViewModel>();
+
+        viewModel.ChooseFolderCommand.CanExecute(null).ShouldBeFalse();
+        viewModel.Prerequisites.Single(x => x.Name == "ffprobe").IsAvailable.ShouldBeFalse();
+    }
+
     private sealed class FakeLocator(bool allAvailable) : IToolLocator
     {
         public string? FindOnPath(string executableName) =>
             allAvailable || executableName != "ffmpeg" ? $@"C:\tools\{executableName}.exe" : null;
+
+        public ToolLocation RequireOnPath(string executableName) =>
+            new() { Name = executableName, FullPath = FindOnPath(executableName)! };
+    }
+
+    private sealed class MissingFfprobeLocator : IToolLocator
+    {
+        public string? FindOnPath(string executableName) =>
+            executableName == "ffprobe" ? null : $@"C:\tools\{executableName}.exe";
 
         public ToolLocation RequireOnPath(string executableName) =>
             new() { Name = executableName, FullPath = FindOnPath(executableName)! };

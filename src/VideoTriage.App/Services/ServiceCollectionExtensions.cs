@@ -1,6 +1,9 @@
 using System.IO;
+using System.Windows;
+using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using VideoTriage.App.ViewModels;
 using VideoTriage.App.Views;
 using VideoTriage.Core.Encoding;
 using VideoTriage.Core.FileSystem;
@@ -25,6 +28,9 @@ public static class ServiceCollectionExtensions
     {
         services.TryAddSingleton<IToolLocator, ToolLocator>();
         services.AddSingleton<IPrerequisiteService, PrerequisiteService>();
+        services.TryAddSingleton<IDialogService, DialogService>();
+        services.TryAddSingleton<IUiDispatcher>(
+            _ => new UiDispatcher(Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher));
         services.AddSingleton<IProcessRunner, ProcessRunner>();
         services.AddSingleton<IFileSystem, PhysicalFileSystem>();
         services.AddSingleton<IVideoFileDiscovery, VideoFileDiscovery>();
@@ -68,6 +74,30 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<Func<string, IDeleteManifest>>(),
                 sp.GetRequiredService<Func<string, IResultLog>>());
             return new TriagePipelineProvider(pipeline);
+        });
+        services.AddSingleton(sp =>
+        {
+            var prerequisiteService = sp.GetRequiredService<IPrerequisiteService>();
+            var statuses = prerequisiteService.Check();
+            var ffprobePath = statuses.SingleOrDefault(x => x.Name == "ffprobe" && x.IsAvailable)?.FullPath;
+            IFolderProbeScanner? scanner = null;
+
+            if (!string.IsNullOrWhiteSpace(ffprobePath))
+            {
+                scanner = new FolderProbeScanner(
+                    sp.GetRequiredService<IVideoFileDiscovery>(),
+                    new FfprobeService(
+                        ffprobePath,
+                        sp.GetRequiredService<IProcessRunner>(),
+                        sp.GetRequiredService<FfprobeJsonParser>()),
+                    sp.GetRequiredService<IVideoClassifier>());
+            }
+
+            return new MainViewModel(
+                scanner,
+                sp.GetRequiredService<IDialogService>(),
+                sp.GetRequiredService<IUiDispatcher>(),
+                prerequisiteService);
         });
         services.AddSingleton<MainWindow>();
 
