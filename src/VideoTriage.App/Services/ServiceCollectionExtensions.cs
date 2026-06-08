@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using VideoTriage.App.ViewModels;
 using VideoTriage.App.Views;
 using VideoTriage.Core.Encoding;
@@ -24,18 +25,28 @@ public static class ServiceCollectionExtensions
         services.AddVideoTriageCore(Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "VideoTriage",
-            "settings.json"));
+            "settings.json"),
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "VideoTriage",
+                "Logs"));
 
     public static IServiceCollection AddVideoTriageForTests(this IServiceCollection services) =>
         services.AddVideoTriageCore(Path.Combine(
             Path.GetTempPath(),
             "VideoTriage.Tests",
             Guid.NewGuid().ToString("N"),
-            "settings.json"));
+            "settings.json"),
+            Path.Combine(
+                Path.GetTempPath(),
+                "VideoTriage.Tests",
+                Guid.NewGuid().ToString("N"),
+                "Logs"));
 
     private static IServiceCollection AddVideoTriageCore(
         this IServiceCollection services,
-        string settingsPath)
+        string settingsPath,
+        string logDirectory)
     {
         services.TryAddSingleton<IToolLocator, ToolLocator>();
         services.AddSingleton<IPrerequisiteService, PrerequisiteService>();
@@ -43,6 +54,12 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IUiDispatcher>(
             _ => new UiDispatcher(Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher));
         services.TryAddSingleton<ISettingsStore>(_ => new JsonSettingsStore(settingsPath));
+        services.TryAddSingleton(new RollingFileLogPath(logDirectory));
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<ILoggerProvider, RollingFileLoggerProvider>());
+        services.AddLogging(builder => builder.SetMinimumLevel(LogLevel.Information));
+        services.TryAddSingleton<IAppLog, AppLog>();
+        services.TryAddSingleton<IUserErrorSink, UserErrorSink>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<IProcessRunner, ProcessRunner>();
         services.AddSingleton<IFileSystem, PhysicalFileSystem>();

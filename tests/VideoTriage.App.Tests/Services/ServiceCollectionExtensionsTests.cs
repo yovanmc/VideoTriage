@@ -32,6 +32,9 @@ public sealed class ServiceCollectionExtensionsTests
         using var provider = services.BuildServiceProvider();
 
         provider.GetRequiredService<IPrerequisiteService>().ShouldBeOfType<PrerequisiteService>();
+        provider.GetRequiredService<IAppLog>().ShouldBeOfType<AppLog>();
+        provider.GetRequiredService<IUserErrorSink>().ShouldBeOfType<UserErrorSink>();
+        provider.GetRequiredService<RollingFileLogPath>().LogDirectory.ShouldContain("VideoTriage.Tests");
         provider.GetRequiredService<ITriagePipelineProvider>().Pipeline
             .ShouldBeOfType<TriagePipeline>();
     }
