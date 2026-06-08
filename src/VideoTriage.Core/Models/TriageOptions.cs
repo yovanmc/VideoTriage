@@ -14,4 +14,10 @@ public sealed record TriageOptions
         ".wmv",
         ".webm"
     ];
+
+    public bool DeepVerify { get; init; } = true;
+    public double DurationTolerancePercent { get; init; } = 5;
+    public bool RequireResolutionMatch { get; init; } = true;
+    public double ResolutionTolerancePercent { get; init; } = 2;
+    public bool RequireAudioParity { get; init; } = true;
 }
