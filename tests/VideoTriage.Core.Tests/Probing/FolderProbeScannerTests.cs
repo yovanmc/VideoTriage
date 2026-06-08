@@ -9,6 +9,21 @@ namespace VideoTriage.Core.Tests.Probing;
 public sealed class FolderProbeScannerTests
 {
     [Fact]
+    public async Task Scanner_IsConsumableThroughInterfaceWithAbstractDependencies()
+    {
+        IVideoFileDiscovery discovery = new StubVideoFileDiscovery();
+        IVideoClassifier classifier = new StubVideoClassifier();
+        IFolderProbeScanner scanner = new FolderProbeScanner(
+            discovery,
+            new FakeFfprobeService(),
+            classifier);
+
+        var results = await scanner.ScanAsync(@"C:\videos");
+
+        results.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task ScanAsync_ClassifiesSuccessfulProbes()
     {
         using var temp = new TempDirectory();
@@ -166,6 +181,23 @@ public sealed class FolderProbeScannerTests
     private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
     {
         public void Report(T value) => report(value);
+    }
+
+    private sealed class StubVideoFileDiscovery : IVideoFileDiscovery
+    {
+        public IReadOnlyList<string> FindVideos(
+            string folderPath,
+            TriageOptions? options = null,
+            bool recursive = false) =>
+            [];
+    }
+
+    private sealed class StubVideoClassifier : IVideoClassifier
+    {
+        public ClassificationResult Classify(
+            VideoStats stats,
+            TriageOptions? options = null) =>
+            throw new NotSupportedException();
     }
 
     private sealed class TempDirectory : IDisposable

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Shouldly;
 using VideoTriage.Core.Formatting;
 using Xunit;
@@ -24,5 +25,21 @@ public class HumanSizeTests
     public void Format_NegativeBytes_IsTreatedAsZero()
     {
         HumanSize.Format(-5).ShouldBe("0 B");
+    }
+
+    [Fact]
+    public void Format_UsesInvariantDecimalSeparator()
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
+
+            HumanSize.Format(1_572_864).ShouldBe("1.5 MB");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+        }
     }
 }

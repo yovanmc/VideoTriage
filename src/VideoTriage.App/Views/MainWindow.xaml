@@ -3,28 +3,161 @@
                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                  xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
                  Title="VideoTriage"
-                 Width="1180" Height="760"
-                 MinWidth="900" MinHeight="600"
-                 WindowBackdropType="Mica"
+                 Width="1180"
+                 Height="760"
+                 MinWidth="900"
+                 MinHeight="600"
                  ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica"
                  WindowStartupLocation="CenterScreen">
+    <ui:FluentWindow.Resources>
+        <SolidColorBrush x:Key="AccentBrush" Color="#5CC8FF" />
+        <SolidColorBrush x:Key="SuccessBrush" Color="#5AD17F" />
+        <SolidColorBrush x:Key="WarningBrush" Color="#E8C35A" />
+        <SolidColorBrush x:Key="DangerBrush" Color="#FF6B6B" />
+    </ui:FluentWindow.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="44" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="58" />
         </Grid.RowDefinitions>
 
         <ui:TitleBar Grid.Row="0" Title="VideoTriage" />
 
-        <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center">
-            <ui:SymbolIcon Symbol="Video24" FontSize="48" HorizontalAlignment="Center" />
-            <TextBlock Text="VideoTriage"
-                       FontSize="24" FontWeight="SemiBold"
-                       HorizontalAlignment="Center" Margin="0,12,0,4" />
-            <TextBlock Text="AV1 batch compressor — shell is alive."
-                       Opacity="0.6" HorizontalAlignment="Center" />
-            <ui:Button Content="Choose folder…" Icon="{ui:SymbolIcon Folder24}"
-                       Appearance="Primary" HorizontalAlignment="Center" Margin="0,20,0,0" />
-        </StackPanel>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="288" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Padding="16"
+                    BorderBrush="#22000000"
+                    BorderThickness="0,0,1,0">
+                <StackPanel>
+                    <TextBlock Text="Source folder" FontWeight="SemiBold" />
+                    <TextBlock Margin="0,6,0,10"
+                               Text="{Binding SelectedFolder}"
+                               TextWrapping="Wrap"
+                               Opacity="0.7" />
+                    <Button Content="Choose folder"
+                            Command="{Binding ChooseFolderCommand}" />
+
+                    <TextBlock Margin="0,24,0,8"
+                               Text="Preset"
+                               FontWeight="SemiBold" />
+                    <TextBlock Text="VideoTriage AV1" />
+                    <TextBlock Text="Read-only scan before encoding"
+                               Opacity="0.7"
+                               TextWrapping="Wrap" />
+
+                    <TextBlock Margin="0,24,0,8"
+                               Text="Prerequisites"
+                               FontWeight="SemiBold" />
+                    <ItemsControl ItemsSource="{Binding Prerequisites}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Name}" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding IsAvailable}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="64" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0"
+                        Padding="16,10"
+                        BorderBrush="#22000000"
+                        BorderThickness="0,0,0,1">
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="StartButton"
+                                Content="Start"
+                                Width="92"
+                                IsEnabled="False" />
+                        <Button x:Name="PauseButton"
+                                Content="Pause"
+                                Width="92"
+                                Margin="8,0,0,0"
+                                IsEnabled="False" />
+                        <Button x:Name="StopButton"
+                                Content="Stop"
+                                Width="92"
+                                Margin="8,0,0,0"
+                                IsEnabled="False" />
+                        <TextBlock Margin="16,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Text="{Binding IsScanning, StringFormat=Scanning: {0}}" />
+                    </StackPanel>
+                </Border>
+
+                <ListBox Grid.Row="1"
+                         Margin="16"
+                         ItemsSource="{Binding Items}"
+                         BorderThickness="0"
+                         Background="Transparent">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,0,0,10"
+                                    Padding="12"
+                                    CornerRadius="8"
+                                    Background="#0F7F7F7F">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="96" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="180" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="96"
+                                            Height="56"
+                                            CornerRadius="4"
+                                            Background="#247F7F7F" />
+                                    <StackPanel Grid.Column="1" Margin="14,0">
+                                        <TextBlock Text="{Binding FileName}"
+                                                   FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding MetaLine}"
+                                                   Opacity="0.7" />
+                                        <ProgressBar Height="4"
+                                                     Margin="0,8,0,0"
+                                                     Minimum="0"
+                                                     Maximum="100"
+                                                     Value="{Binding Progress}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="{Binding StatusText}"
+                                                   HorizontalAlignment="Right" />
+                                        <TextBlock Text="{Binding SavedText}"
+                                                   HorizontalAlignment="Right"
+                                                   Foreground="{StaticResource SuccessBrush}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Grid>
+
+        <Border Grid.Row="2"
+                Padding="18,0"
+                BorderBrush="#22000000"
+                BorderThickness="0,1,0,0">
+            <TextBlock VerticalAlignment="Center"
+                       Text="{Binding Items.Count, StringFormat=Queue: {0} files}" />
+        </Border>
     </Grid>
 </ui:FluentWindow>

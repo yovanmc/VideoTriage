@@ -3,16 +3,16 @@ using VideoTriage.Core.Models;
 
 namespace VideoTriage.Core.Probing;
 
-public sealed class FolderProbeScanner
+public sealed class FolderProbeScanner : IFolderProbeScanner
 {
-    private readonly VideoFileDiscovery _discovery;
+    private readonly IVideoFileDiscovery _discovery;
     private readonly IFfprobeService _ffprobeService;
-    private readonly BppClassifier _classifier;
+    private readonly IVideoClassifier _classifier;
 
     public FolderProbeScanner(
-        VideoFileDiscovery discovery,
+        IVideoFileDiscovery discovery,
         IFfprobeService ffprobeService,
-        BppClassifier classifier)
+        IVideoClassifier classifier)
     {
         _discovery = discovery ?? throw new ArgumentNullException(nameof(discovery));
         _ffprobeService = ffprobeService ?? throw new ArgumentNullException(nameof(ffprobeService));

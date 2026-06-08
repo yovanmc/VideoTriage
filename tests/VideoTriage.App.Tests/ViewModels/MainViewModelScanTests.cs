@@ -1,0 +1,132 @@
+using Shouldly;
+using VideoTriage.App.Services;
+using VideoTriage.App.Tests.Fakes;
+using VideoTriage.App.ViewModels;
+using VideoTriage.Core.Models;
+
+namespace VideoTriage.App.Tests.ViewModels;
+
+public sealed class MainViewModelScanTests
+{
+    [Fact]
+    public async Task ChooseFolderAsync_CancelledDialog_DoesNotScanOrClearQueue()
+    {
+        var scanner = new FakeFolderProbeScanner();
+        var dialog = new FakeDialogService { Result = null };
+        var vm = Create(scanner, dialog);
+        vm.Items.Add(new FileItemViewModel(@"C:\old.mp4"));
+
+        await vm.ChooseFolderAsync();
+
+        scanner.LastFolder.ShouldBeNull();
+        vm.Items.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task ChooseFolderAsync_SelectedFolder_ClearsAndAddsOneRowPerProgress()
+    {
+        var scanner = new FakeFolderProbeScanner();
+        scanner.Results.Add(Result(@"C:\videos\a.mp4"));
+        scanner.Results.Add(Result(@"C:\videos\b.mp4"));
+        var dispatcher = new RecordingUiDispatcher();
+        var vm = Create(
+            scanner,
+            new FakeDialogService { Result = @"C:\videos" },
+            dispatcher);
+        vm.Items.Add(new FileItemViewModel(@"C:\old.mp4"));
+
+        await vm.ChooseFolderAsync();
+
+        vm.SelectedFolder.ShouldBe(@"C:\videos");
+        vm.Items.Select(item => item.FileName).ShouldBe(["a.mp4", "b.mp4"]);
+        dispatcher.PostCount.ShouldBe(3);
+        vm.IsScanning.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task ChooseFolderAsync_WhileScanning_DisablesChooseFolder()
+    {
+        var release = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var scanner = new FakeFolderProbeScanner { BlockUntil = release };
+        var vm = Create(scanner, new FakeDialogService { Result = @"C:\videos" });
+
+        var scan = vm.ChooseFolderAsync();
+
+        vm.IsScanning.ShouldBeTrue();
+        vm.ChooseFolderCommand.CanExecute(null).ShouldBeFalse();
+        release.SetResult();
+        await scan;
+        vm.ChooseFolderCommand.CanExecute(null).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Constructor_WithoutScanner_DisablesChooseFolderButKeepsPrerequisites()
+    {
+        var vm = new MainViewModel(
+            scanner: null,
+            new FakeDialogService { Result = @"C:\videos" },
+            new RecordingUiDispatcher(),
+            new MissingFfprobePrerequisiteService());
+
+        vm.ChooseFolderCommand.CanExecute(null).ShouldBeFalse();
+        vm.Prerequisites.Any(x => !x.IsAvailable).ShouldBeTrue();
+    }
+
+    private static MainViewModel Create(
+        FakeFolderProbeScanner scanner,
+        FakeDialogService dialog,
+        RecordingUiDispatcher? dispatcher = null) =>
+        new(
+            scanner,
+            dialog,
+            dispatcher ?? new RecordingUiDispatcher(),
+            new AvailablePrerequisiteService());
+
+    private static ProbeResult Result(string path)
+    {
+        var stats = new VideoStats
+        {
+            FilePath = path,
+            CodecName = "h264",
+            Width = 1920,
+            Height = 1080,
+            FramesPerSecond = 30,
+            Duration = TimeSpan.FromMinutes(1),
+            FileSizeBytes = 30_000_000,
+            VideoBitrateBitsPerSecond = 12_441_600,
+            HasAudio = true
+        };
+        return new ProbeResult
+        {
+            FilePath = path,
+            Stats = stats,
+            Classification = new ClassificationResult
+            {
+                Outcome = ClassificationOutcome.Candidate,
+                Reason = "candidate",
+                Stats = stats
+            }
+        };
+    }
+
+    private sealed class AvailablePrerequisiteService : IPrerequisiteService
+    {
+        public IReadOnlyList<ToolPrerequisiteStatus> Check() =>
+        [
+            new("ffprobe", true, @"C:\tools\ffprobe.exe", ""),
+            new("ffmpeg", true, @"C:\tools\ffmpeg.exe", ""),
+            new("HandBrakeCLI", true, @"C:\tools\HandBrakeCLI.exe", "")
+        ];
+    }
+
+    private sealed class MissingFfprobePrerequisiteService : IPrerequisiteService
+    {
+        public IReadOnlyList<ToolPrerequisiteStatus> Check() =>
+        [
+            new("ffprobe", false, null, "winget install Gyan.FFmpeg"),
+            new("ffmpeg", true, @"C:\tools\ffmpeg.exe", ""),
+            new("HandBrakeCLI", true, @"C:\tools\HandBrakeCLI.exe", "")
+        ];
+    }
+}
