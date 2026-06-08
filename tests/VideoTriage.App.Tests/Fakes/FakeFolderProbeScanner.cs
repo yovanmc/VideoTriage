@@ -1,0 +1,28 @@
+using VideoTriage.Core.Models;
+using VideoTriage.Core.Probing;
+
+namespace VideoTriage.App.Tests.Fakes;
+
+public sealed class FakeFolderProbeScanner : IFolderProbeScanner
+{
+    public List<ProbeResult> Results { get; } = [];
+    public string? LastFolder { get; private set; }
+    public TaskCompletionSource? BlockUntil { get; set; }
+
+    public async Task<IReadOnlyList<ProbeResult>> ScanAsync(
+        string folderPath,
+        TriageOptions? options = null,
+        bool recursive = false,
+        IProgress<ProbeResult>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        LastFolder = folderPath;
+        foreach (var result in Results)
+            progress?.Report(result);
+
+        if (BlockUntil is not null)
+            await BlockUntil.Task.WaitAsync(cancellationToken);
+
+        return Results;
+    }
+}
