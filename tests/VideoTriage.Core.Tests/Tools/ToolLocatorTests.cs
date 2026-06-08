@@ -60,6 +60,19 @@ public sealed class ToolLocatorTests
         exception.Message.ShouldContain("PATH");
     }
 
+    [Fact]
+    public void RequireOnPath_UsesGenericInstallHint()
+    {
+        using var temp = new TempDirectory();
+
+        var exception = Should.Throw<FileNotFoundException>(() =>
+            new ToolLocator(pathOverride: temp.Path).RequireOnPath("HandBrakeCLI"));
+
+        exception.Message.ShouldContain("HandBrakeCLI");
+        exception.Message.ShouldContain("Install it");
+        exception.Message.ShouldNotContain("ffmpeg");
+    }
+
     private sealed class TempDirectory : IDisposable
     {
         public TempDirectory()

@@ -37,7 +37,7 @@ public sealed class ToolLocator : IToolLocator
         if (fullPath is null)
         {
             throw new FileNotFoundException(
-                $"Required tool '{executableName}' was not found on PATH. Install ffmpeg/ffprobe and make sure the executable directory is on PATH.");
+                $"Required tool '{executableName}' was not found on PATH. Install it and make sure the executable directory is on PATH.");
         }
 
         return new ToolLocation

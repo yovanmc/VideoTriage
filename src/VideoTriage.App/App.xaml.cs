@@ -10,26 +10,51 @@ public partial class App : Application
 {
     private IHost? _host;
 
-    protected override async void OnStartup(StartupEventArgs e)
+    protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
-        _host = Host.CreateDefaultBuilder()
-            .ConfigureServices(services => services.AddVideoTriage())
-            .Build();
+        try
+        {
+            _host = Host.CreateDefaultBuilder()
+                .ConfigureServices(services => services.AddVideoTriage())
+                .Build();
 
-        await _host.StartAsync();
-        _host.Services.GetRequiredService<MainWindow>().Show();
+            _host.StartAsync().GetAwaiter().GetResult();
+            _ = _host.Services.GetRequiredService<ITriagePipelineProvider>();
+            _host.Services.GetRequiredService<MainWindow>().Show();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                exception.Message,
+                "VideoTriage startup failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            try
+            {
+                _host?.StopAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
+            }
+            catch
+            {
+                // Preserve the original startup failure shown to the user.
+            }
+            _host?.Dispose();
+            _host = null;
+            Shutdown(1);
+        }
     }
 
-    protected override async void OnExit(ExitEventArgs e)
+    protected override void OnExit(ExitEventArgs e)
     {
-        if (_host is not null)
+        try
         {
-            await _host.StopAsync(TimeSpan.FromSeconds(5));
-            _host.Dispose();
+            _host?.StopAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
         }
-
-        base.OnExit(e);
+        finally
+        {
+            _host?.Dispose();
+            base.OnExit(e);
+        }
     }
 }
