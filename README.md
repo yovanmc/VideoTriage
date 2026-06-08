@@ -6,6 +6,15 @@ smaller AND verified playable**, then safely removing the original. A Windows de
 
 > **[WIP]** Early development. See `docs/superpowers/plans/` for the build plan.
 
+## Prerequisites
+
+- Windows 10 or later
+- .NET 10 SDK
+- `ffmpeg` and `ffprobe` on `PATH` for probing and output verification
+- `HandBrakeCLI` on `PATH` with NVEnc AV1 10-bit support for candidate encoding
+
+Core unit tests use fake process and tool adapters, so they do not require HandBrakeCLI.
+
 ## Status
 - [x] Scaffold + Fluent shell
 - [x] Core probe/classify scan API
