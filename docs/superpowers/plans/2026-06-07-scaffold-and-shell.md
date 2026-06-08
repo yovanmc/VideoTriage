@@ -1,5 +1,8 @@
 # VideoTriage — Scaffold & Shell Implementation Plan
 
+> **Status:** Implemented on `main`. Retained as historical execution documentation; it is not part
+> of the remaining application plan queue.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Stand up the VideoTriage solution — git repo, 3-project structure, a passing test, a Fluent (Mica dark) WPF window that launches, and green CI — so every later plan builds on a working, tested foundation.

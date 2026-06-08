@@ -1,5 +1,8 @@
 # Core Probe Classify Implementation Plan
 
+> **Status:** Implemented on `main` by merge commit `76194ec`. Retained as the reference example for
+> detailed TDD plan structure; do not execute it again.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the first non-destructive VideoTriage engine slice: discover videos, probe metadata with `ffprobe`, classify AV1 candidates by bits-per-pixel, and provide a console harness that lists candidates for a folder.
@@ -2573,4 +2576,4 @@ Plan complete and saved to `docs/superpowers/plans/2026-06-07-core-probe-classif
 
 **2. Inline Execution** - Execute tasks in this session using executing-plans, batch execution with checkpoints.
 
-Which approach?
+This plan is complete on `main`; no execution handoff remains.
