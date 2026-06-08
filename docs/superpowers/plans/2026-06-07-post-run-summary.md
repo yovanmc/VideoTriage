@@ -18,6 +18,17 @@ controls are integrated.
 
 **Working directory for every command:** `C:\Agent Projects\VideoTriage`
 
+## Execution Corrections
+
+- `Marginal` is a subset of `Replaced`; never add it to kept counts or chart segments.
+- Weighted reduction includes terminal files with `Replaced` or `ReplacePartial` outcomes.
+- `KeptCount` is `max(0, Scanned - Replaced)`, and the five outcome segments sum to the terminal
+  outcome categories without double-counting marginal replacements.
+- The data directory is derived from the selected folder and current
+  `TriageOptions.DataDirectoryName`; it is not a static application path.
+- Integrate `SummaryView` into the existing main shell with observable view state rather than
+  relying on an undefined navigation service.
+
 ## File Structure
 
 ```text
