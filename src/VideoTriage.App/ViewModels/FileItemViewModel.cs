@@ -84,4 +84,43 @@ public sealed class FileItemViewModel : ObservableObject
             _ => "Invalid metadata"
         };
     }
+
+    public void Apply(FileProgress progressEvent)
+    {
+        ArgumentNullException.ThrowIfNull(progressEvent);
+        if (!StringComparer.OrdinalIgnoreCase.Equals(
+                Path.GetFullPath(progressEvent.FilePath),
+                FilePath))
+        {
+            throw new ArgumentException("Progress event belongs to another file.", nameof(progressEvent));
+        }
+
+        if (progressEvent.EncodeProgress.HasValue)
+            Progress = Math.Round(progressEvent.EncodeProgress.Value * 100, 1);
+
+        StatusText = progressEvent.Phase switch
+        {
+            TriagePhase.Encoding => $"Encoding {Progress.ToString("0.#", CultureInfo.InvariantCulture)}%",
+            TriagePhase.Verifying => "Verifying output",
+            TriagePhase.EmbeddingPoster => "Embedding poster",
+            TriagePhase.Replacing => "Replacing original",
+            TriagePhase.Done => DoneText(progressEvent),
+            _ => progressEvent.Phase.ToString()
+        };
+
+        if (!string.IsNullOrWhiteSpace(progressEvent.FinalPath))
+            SavedText = progressEvent.FinalPath;
+    }
+
+    private static string DoneText(FileProgress progressEvent) =>
+        progressEvent.Outcome switch
+        {
+            TriageOutcome.Replaced =>
+                $"Saved {(progressEvent.SavedPercent ?? 0).ToString("0.#", CultureInfo.InvariantCulture)}%",
+            TriageOutcome.ReplacePartial => "Saved as recoverable partial",
+            TriageOutcome.OutputInvalid => "Verification failed; original kept",
+            TriageOutcome.GrewKeptOriginal => "Encode grew; original kept",
+            TriageOutcome.Cancelled => "Cancelled; original kept",
+            _ => progressEvent.Message ?? "Done"
+        };
 }
