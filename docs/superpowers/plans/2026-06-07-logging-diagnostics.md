@@ -26,6 +26,9 @@ It assumes prerequisites composition, run controls, and post-run summary are int
 - Preserve the current `RunState` command state machine and post-run summary behavior. Add a
   `StatusMessage` property rather than replacing the established run-control model.
 - Test composition with isolated temporary log paths; tests never write to the user's LocalAppData.
+- Do not claim that all originals remain unchanged after a run-level exception or cancellation:
+  earlier files may already have completed replacement. Tell the user that completed replacements
+  may remain and to review the queue and log before retrying.
 
 ## File Structure
 

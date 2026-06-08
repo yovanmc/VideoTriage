@@ -61,6 +61,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IAppLog, AppLog>();
         services.TryAddSingleton<IUserErrorSink, UserErrorSink>();
         services.AddSingleton<SettingsViewModel>();
+        services.AddSingleton<DiagnosticsViewModel>();
         services.AddSingleton<IProcessRunner, ProcessRunner>();
         services.AddSingleton<IFileSystem, PhysicalFileSystem>();
         services.AddSingleton<IVideoFileDiscovery, VideoFileDiscovery>();
@@ -132,7 +133,10 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<IUiDispatcher>(),
                 prerequisiteService,
                 sp.GetRequiredService<ITriagePipelineProvider>(),
-                settings: settings);
+                settings: settings,
+                appLog: sp.GetRequiredService<IAppLog>(),
+                userErrors: sp.GetRequiredService<IUserErrorSink>(),
+                diagnostics: sp.GetRequiredService<DiagnosticsViewModel>());
         });
         services.AddSingleton<MainWindow>();
 
