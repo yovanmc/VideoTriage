@@ -1,4 +1,6 @@
+using System.Windows.Threading;
 using Shouldly;
+using VideoTriage.App.Services;
 using VideoTriage.App.Tests.Fakes;
 
 namespace VideoTriage.App.Tests.Services;
@@ -25,5 +27,33 @@ public sealed class UiServiceTests
 
         executed.ShouldBeTrue();
         dispatcher.PostCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public void UiDispatcher_Post_ExecutesBeforeReturning()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var dispatcher = new UiDispatcher(Dispatcher.CurrentDispatcher);
+                var executed = false;
+
+                dispatcher.Post(() => executed = true);
+
+                executed.ShouldBeTrue();
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+
+        thread.Start();
+
+        thread.Join(TimeSpan.FromSeconds(5)).ShouldBeTrue("STA dispatcher test timed out.");
+        failure.ShouldBeNull();
     }
 }

@@ -3,6 +3,7 @@ using Shouldly;
 using VideoTriage.App.Services;
 using VideoTriage.App.Tests.Fakes;
 using VideoTriage.App.ViewModels;
+using VideoTriage.App.Views;
 using VideoTriage.Core.Pipeline;
 using VideoTriage.Core.Tools;
 
@@ -79,6 +80,41 @@ public sealed class ServiceCollectionExtensionsTests
 
         viewModel.ChooseFolderCommand.CanExecute(null).ShouldBeFalse();
         viewModel.Prerequisites.Single(x => x.Name == "ffprobe").IsAvailable.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void AddVideoTriage_FfprobeMissing_StillResolvesMainWindow()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var services = new ServiceCollection();
+                services.AddSingleton<IToolLocator>(new MissingFfprobeLocator());
+                services.AddSingleton<IDialogService>(new FakeDialogService());
+                services.AddSingleton<IUiDispatcher>(new RecordingUiDispatcher());
+
+                services.AddVideoTriageForTests();
+                using var provider = services.BuildServiceProvider();
+                var window = provider.GetRequiredService<MainWindow>();
+                var viewModel = window.DataContext.ShouldBeOfType<MainViewModel>();
+
+                viewModel.ChooseFolderCommand.CanExecute(null).ShouldBeFalse();
+                viewModel.Prerequisites.Single(x => x.Name == "ffprobe").IsAvailable.ShouldBeFalse();
+                window.Close();
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+
+        thread.Start();
+
+        thread.Join(TimeSpan.FromSeconds(5)).ShouldBeTrue("STA window resolution timed out.");
+        failure.ShouldBeNull();
     }
 
     private sealed class FakeLocator(bool allAvailable) : IToolLocator
