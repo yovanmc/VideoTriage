@@ -349,7 +349,7 @@ if (completedByPath.TryGetValue(Path.GetFullPath(path), out var prior) &&
     fileSystem.GetFileLength(path) == prior.SourceLength &&
     fileSystem.GetLastWriteTimeUtc(path) == prior.SourceLastWriteUtc)
 {
-    Complete(path, TriageOutcome.SkippedAlreadyCompleted, "Already completed in a prior run.");
+    Complete(path, TriageOutcome.AlreadyCompleted, "Already completed in a prior run.");
     continue; // no probe, no encode, no re-append
 }
 ```
@@ -391,9 +391,9 @@ Rules enforced by the tests:
 - Write a delete manifest only after `ReplaceResult.OriginalRemoved` is true.
 - Dry-run performs **no** persistent writes and does not create the data directory.
 
-> Note: `TriageOutcome.SkippedAlreadyCompleted` is the resume-skip outcome. If it is not yet on the
-> `TriageOutcome` enum (defined in pipeline-orchestration), add it there as part of this task and map
-> it to the summary `Skipped` bucket.
+> Note: `TriageOutcome.AlreadyCompleted` is the resume-skip outcome. It already exists on the
+> `TriageOutcome` enum (added in pipeline-orchestration) and the pipeline already maps it to the
+> summary `Skipped` bucket and excludes it from `Candidates`, so no enum change is needed here.
 
 - [ ] **Step 4: Run green and final verification**
 
