@@ -17,6 +17,16 @@ It assumes prerequisites composition, run controls, and post-run summary are int
 
 **Working directory for every command:** `C:\Agent Projects\VideoTriage`
 
+## Execution Corrections
+
+- Register one singleton `DiagnosticsViewModel`, expose it from `MainViewModel`, and render the
+  diagnostics view in the existing shell; a view that is not reachable does not satisfy the goal.
+- After adding a run failure to `IUserErrorSink`, call `DiagnosticsViewModel.Refresh()` so its
+  snapshot properties notify the UI.
+- Preserve the current `RunState` command state machine and post-run summary behavior. Add a
+  `StatusMessage` property rather than replacing the established run-control model.
+- Test composition with isolated temporary log paths; tests never write to the user's LocalAppData.
+
 ## File Structure
 
 ```text
