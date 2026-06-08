@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 
 namespace VideoTriage.Core.Tools;
 
@@ -25,7 +26,7 @@ public sealed class ProcessRunner : IProcessRunner
         var stopwatch = Stopwatch.StartNew();
         process.Start();
 
-        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stdoutTask = ReadStandardOutputAsync(process, request.StandardOutputLines);
         var stderrTask = CopyStandardErrorAsync(process, stderrPath);
 
         var timedOut = false;
@@ -98,6 +99,20 @@ public sealed class ProcessRunner : IProcessRunner
         {
             await writer.WriteLineAsync(line);
         }
+    }
+
+    private static async Task<string> ReadStandardOutputAsync(
+        Process process,
+        IProgress<string>? progress)
+    {
+        var output = new StringBuilder();
+        while (await process.StandardOutput.ReadLineAsync() is { } line)
+        {
+            progress?.Report(line);
+            output.AppendLine(line);
+        }
+
+        return output.ToString();
     }
 
     private static void KillProcessTree(Process process)
