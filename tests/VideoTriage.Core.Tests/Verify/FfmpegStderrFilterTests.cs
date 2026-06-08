@@ -79,4 +79,20 @@ public sealed class FfmpegStderrFilterTests
 
         FfmpegStderrFilter.RealErrorLines(stderr).ShouldBeEmpty();
     }
+
+    [Fact]
+    public void FirstRealErrorLine_StopsAfterFirstRealError()
+    {
+        var lines = LinesThatThrowAfterFirstError();
+
+        FfmpegStderrFilter.FirstRealErrorLine(lines)
+            .ShouldBe("corrupt decoded frame");
+    }
+
+    private static IEnumerable<string> LinesThatThrowAfterFirstError()
+    {
+        yield return "non monotonically increasing dts to muxer in stream 0";
+        yield return "corrupt decoded frame";
+        throw new InvalidOperationException("Enumeration should have stopped.");
+    }
 }

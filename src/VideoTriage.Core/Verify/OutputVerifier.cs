@@ -100,21 +100,45 @@ public sealed class OutputVerifier(
             },
             cancellationToken);
 
-        var stderrText = File.Exists(processResult.StandardErrorPath)
-            ? File.ReadAllText(processResult.StandardErrorPath)
-            : string.Empty;
-        var realErrors = FfmpegStderrFilter.RealErrorLines(stderrText);
+        try
+        {
+            var firstError = File.Exists(processResult.StandardErrorPath)
+                ? FfmpegStderrFilter.FirstRealErrorLine(
+                    File.ReadLines(processResult.StandardErrorPath))
+                : null;
 
-        if (realErrors.Count > 0)
-            return realErrors[0];
+            if (firstError is not null)
+                return firstError;
 
-        return processResult.Succeeded
-            ? null
-            : $"ffmpeg exited {processResult.ExitCode}";
+            return processResult.Succeeded
+                ? null
+                : $"ffmpeg exited {processResult.ExitCode}";
+        }
+        finally
+        {
+            DeleteStderrFile(processResult.StandardErrorPath);
+        }
     }
 
     private static VerificationResult Fail(
         VerificationOutcome outcome,
         string reason) =>
         new() { Outcome = outcome, Reason = reason };
+
+    private static void DeleteStderrFile(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        try
+        {
+            File.Delete(path);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
 }

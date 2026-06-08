@@ -249,6 +249,22 @@ public sealed class OutputVerifierTests : IDisposable
     }
 
     [Fact]
+    public async Task VerifyAsync_DeepDecodeDeletesStderrFile()
+    {
+        var outputPath = TempFile("output.mp4");
+        var stderrPath = StderrFile("error while decoding frame");
+        var probeResult = new ProbeResult { FilePath = outputPath, Stats = MakeOutput() };
+        var verifier = new OutputVerifier(
+            "ffmpeg.exe",
+            new FakeProcessRunner(stderrPath),
+            new FakeProbeService(probeResult));
+
+        await verifier.VerifyAsync(MakeSource(), outputPath, DefaultOptions);
+
+        File.Exists(stderrPath).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task VerifyAsync_DeepDecodeHasOnlyBenignDtsNoise_ReturnsValid()
     {
         var outputPath = TempFile("output.mp4");

@@ -26,19 +26,36 @@ public static class FfmpegStderrFilter
 
         foreach (var line in lines)
         {
-            var trimmed = line.Trim();
-            if (trimmed.Length == 0)
-                continue;
-            if (BenignDts.IsMatch(trimmed))
-                continue;
-            if (BenignDroppedDts.IsMatch(trimmed))
-                continue;
-            if (BenignRepeat.IsMatch(trimmed))
-                continue;
-
-            errors.Add(trimmed);
+            if (RealErrorLine(line) is { } error)
+                errors.Add(error);
         }
 
         return errors;
+    }
+
+    public static string? FirstRealErrorLine(IEnumerable<string> lines)
+    {
+        foreach (var line in lines)
+        {
+            if (RealErrorLine(line) is { } error)
+                return error;
+        }
+
+        return null;
+    }
+
+    private static string? RealErrorLine(string line)
+    {
+        var trimmed = line.Trim();
+        if (trimmed.Length == 0)
+            return null;
+        if (BenignDts.IsMatch(trimmed))
+            return null;
+        if (BenignDroppedDts.IsMatch(trimmed))
+            return null;
+        if (BenignRepeat.IsMatch(trimmed))
+            return null;
+
+        return trimmed;
     }
 }
