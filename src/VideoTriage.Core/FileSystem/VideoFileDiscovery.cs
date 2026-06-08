@@ -18,8 +18,7 @@ public sealed class VideoFileDiscovery
         return Directory
             .EnumerateFiles(folderPath, "*", searchOption)
             .Where(path => extensions.Contains(Path.GetExtension(path)))
-            .Where(path => !Path.GetFileName(path).Contains(".videotriage.tmp.", StringComparison.OrdinalIgnoreCase))
-            .Where(path => !Path.GetFileName(path).Contains(".videotriage.partial.", StringComparison.OrdinalIgnoreCase))
+            .Where(path => !TempFileNaming.IsTempArtifact(path))
             .Select(Path.GetFullPath)
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ToArray();
