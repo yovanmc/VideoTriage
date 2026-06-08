@@ -18,6 +18,16 @@ public sealed class UiServiceTests
     }
 
     [Fact]
+    public void FakeDialogService_OpenDirectory_RecordsPath()
+    {
+        var dialog = new FakeDialogService();
+
+        dialog.OpenDirectory(@"C:\videos\_videotriage_data");
+
+        dialog.OpenedDirectory.ShouldBe(@"C:\videos\_videotriage_data");
+    }
+
+    [Fact]
     public void RecordingUiDispatcher_Post_ExecutesActionAndCountsCall()
     {
         var dispatcher = new RecordingUiDispatcher();

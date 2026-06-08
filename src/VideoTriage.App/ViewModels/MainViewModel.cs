@@ -18,6 +18,8 @@ public sealed class MainViewModel : ObservableObject
     private readonly Func<TriageOptions> _optionsFactory;
     private CancellationTokenSource? _runCts;
     private PauseToken? _pauseToken;
+    private string? _lastRunDataDirectory;
+    private SummaryViewModel? _lastSummary;
     private string? _selectedFolder;
     private bool _isScanning;
     private RunState _runState = RunState.Idle;
@@ -48,6 +50,10 @@ public sealed class MainViewModel : ObservableObject
         StopCommand = new RelayCommand(
             Stop,
             () => RunState is RunState.Running or RunState.Paused);
+        OpenDataDirectoryCommand = new RelayCommand(
+            OpenDataDirectory,
+            () => _lastRunDataDirectory is not null);
+        BackToQueueCommand = new RelayCommand(BackToQueue, () => LastSummary is not null);
         if (settings is not null)
             settings.PropertyChanged += (_, _) => StartCommand.NotifyCanExecuteChanged();
     }
@@ -60,6 +66,8 @@ public sealed class MainViewModel : ObservableObject
     public IRelayCommand PauseCommand { get; }
     public IRelayCommand ResumeCommand { get; }
     public IRelayCommand StopCommand { get; }
+    public IRelayCommand OpenDataDirectoryCommand { get; }
+    public IRelayCommand BackToQueueCommand { get; }
 
     public string? SelectedFolder
     {
@@ -91,6 +99,19 @@ public sealed class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _runState, value))
                 NotifyCommandState();
+        }
+    }
+
+    public SummaryViewModel? LastSummary
+    {
+        get => _lastSummary;
+        private set
+        {
+            if (!SetProperty(ref _lastSummary, value))
+                return;
+
+            OpenDataDirectoryCommand.NotifyCanExecuteChanged();
+            BackToQueueCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -142,6 +163,9 @@ public sealed class MainViewModel : ObservableObject
 
         _runCts = new CancellationTokenSource();
         _pauseToken = new PauseToken();
+        _lastRunDataDirectory = null;
+        LastSummary = null;
+        OpenDataDirectoryCommand.NotifyCanExecuteChanged();
         RunState = RunState.Running;
         try
         {
@@ -149,14 +173,19 @@ public sealed class MainViewModel : ObservableObject
                 _dispatcher.Post(() => ApplyProgress(fp)));
             var pipeline = _pipelineProvider!.Pipeline
                 ?? throw new InvalidOperationException("Required video tools are unavailable.");
+            var options = _optionsFactory();
 
-            _ = await pipeline.RunAsync(
+            var summary = await pipeline.RunAsync(
                 SelectedFolder!,
-                _optionsFactory(),
+                options,
                 recursive: true,
                 progress,
                 _pauseToken,
                 _runCts.Token);
+            _lastRunDataDirectory = options.DryRun
+                ? null
+                : Path.Combine(SelectedFolder!, options.DataDirectoryName);
+            LastSummary = new SummaryViewModel(summary);
         }
         catch (OperationCanceledException)
         {
@@ -200,6 +229,19 @@ public sealed class MainViewModel : ObservableObject
     {
         RunState = RunState.Stopping;
         _runCts?.Cancel();
+    }
+
+    private void OpenDataDirectory()
+    {
+        if (_lastRunDataDirectory is not null)
+            _dialogService.OpenDirectory(_lastRunDataDirectory);
+    }
+
+    private void BackToQueue()
+    {
+        _lastRunDataDirectory = null;
+        LastSummary = null;
+        OpenDataDirectoryCommand.NotifyCanExecuteChanged();
     }
 
     private void NotifyCommandState()
