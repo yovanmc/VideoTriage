@@ -16,6 +16,26 @@ This plan is independently testable and non-destructive. It depends on the prere
 plan for `IPrerequisiteService` and `ToolPrerequisiteStatus`. Start, pause, resume, stop, and
 `ITriagePipeline` are added only by `2026-06-07-run-controls.md`.
 
+## Execution Corrections
+
+These corrections are authoritative where later task snippets differ:
+
+- Task 1 changes `FolderProbeScanner` to depend on `IVideoFileDiscovery` and `IVideoClassifier`,
+  not the concrete `VideoFileDiscovery` and `BppClassifier` classes. Existing behavior remains
+  unchanged, and `FolderProbeScannerTests` must prove it is consumable as `IFolderProbeScanner`.
+- Task 2 formats all numeric queue text with `CultureInfo.InvariantCulture`. Update
+  `HumanSize.Format` to use invariant numeric formatting and add a culture-regression test so the
+  expected decimal punctuation is stable on every development and CI machine.
+- Task 3 accepts an unavailable scanner explicitly (`IFolderProbeScanner?`). Folder selection is
+  disabled when the scanner is unavailable. Use an inline `IProgress<ProbeResult>` implementation
+  that calls `IUiDispatcher.Post` synchronously; do not use `Progress<T>`, whose asynchronous
+  callbacks can outlive `ChooseFolderAsync` and reorder queue assertions.
+- Task 4 also modifies `ServiceCollectionExtensions` and its tests. Register `IDialogService`,
+  `IUiDispatcher`, and `MainViewModel`; construct a real `FolderProbeScanner` only when ffprobe is
+  available; inject `null` otherwise; and prove the shell/ViewModel graph remains resolvable with
+  missing prerequisites. Do not register a fake scanner or make missing tools fail application
+  startup.
+
 ## File Structure
 
 ```text
@@ -33,6 +53,8 @@ src/VideoTriage.App/ViewModels/
 src/VideoTriage.App/Views/
   MainWindow.xaml                     # Mockup-derived shell and queue.
   MainWindow.xaml.cs                  # Constructor injection only.
+src/VideoTriage.App/Services/
+  ServiceCollectionExtensions.cs      # MODIFY - compose scanner, ViewModel, dialog, dispatcher.
 tests/VideoTriage.App.Tests/Fakes/
   FakeDialogService.cs
   FakeFolderProbeScanner.cs
@@ -44,6 +66,8 @@ tests/VideoTriage.App.Tests/ViewModels/
   MainViewModelScanTests.cs
 tests/VideoTriage.App.Tests/Views/
   MainWindowMarkupTests.cs
+tests/VideoTriage.App.Tests/Services/
+  ServiceCollectionExtensionsTests.cs # MODIFY - queue UI composition and missing-tool coverage.
 ```
 
 ### Task 1: Add Folder, Scanner, And Dispatcher Seams
@@ -119,10 +143,20 @@ public interface IFolderProbeScanner
 }
 ```
 
-Change only the declaration in `FolderProbeScanner.cs`; retain its constructor and method body:
+Change the declaration and constructor dependency types in `FolderProbeScanner.cs`; retain its
+method body:
 
 ```csharp
 public sealed class FolderProbeScanner : IFolderProbeScanner
+
+private readonly IVideoFileDiscovery _discovery;
+private readonly IFfprobeService _ffprobeService;
+private readonly IVideoClassifier _classifier;
+
+public FolderProbeScanner(
+    IVideoFileDiscovery discovery,
+    IFfprobeService ffprobeService,
+    IVideoClassifier classifier)
 ```
 
 - [ ] **Step 4: Add the application interfaces and physical adapters**
