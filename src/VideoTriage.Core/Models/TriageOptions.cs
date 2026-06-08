@@ -27,6 +27,9 @@ public sealed record TriageOptions
     public double MarginalThresholdPercent { get; init; } = 10;
     public bool DryRun { get; init; }
 
+    public bool EmbedPoster { get; init; } = true;
+    public double PosterTimestampPercent { get; init; } = 10;
+
     // M5 state: per-folder data directory co-located with the scanned videos.
     public string DataDirectoryName { get; init; } = "_videotriage_data";
 }
