@@ -15,6 +15,17 @@
 This plan persists user-editable options only. Tool paths remain discovered prerequisites and the
 HandBrake preset remains an application asset.
 
+## Execution Corrections
+
+- Register one `ISettingsStore` and `SettingsViewModel` in App composition. The production settings
+  path is `%LocalAppData%\VideoTriage\settings.json`.
+- Expose `SettingsViewModel` from `MainViewModel`, render `SettingsView` in the main shell, and build
+  each run's `TriageOptions` from the current validated settings.
+- `ConfirmPermanentDelete` is session-only and is never serialized. When persisted settings select
+  permanent deletion, Start remains disabled after restart until the user confirms it again.
+- Add integration tests proving saved settings reach `ITriagePipeline.RunAsync` and unconfirmed
+  permanent deletion cannot start.
+
 ## File Structure
 
 ```text
