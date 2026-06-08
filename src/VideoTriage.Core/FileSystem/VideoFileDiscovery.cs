@@ -2,7 +2,7 @@ using VideoTriage.Core.Models;
 
 namespace VideoTriage.Core.FileSystem;
 
-public sealed class VideoFileDiscovery
+public sealed class VideoFileDiscovery : IVideoFileDiscovery
 {
     public IReadOnlyList<string> FindVideos(string folderPath, TriageOptions? options = null, bool recursive = false)
     {
