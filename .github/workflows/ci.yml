@@ -132,10 +132,10 @@ jobs:
           if ($manifest.Package.Identity.ProcessorArchitecture -ne 'x64') {
             throw 'Built package is not x64.'
           }
-          if (-not (Test-Path "$unpack/VideoTriage.App.exe")) {
+          if (-not (Test-Path "$unpack/VideoTriage.App/VideoTriage.App.exe")) {
             throw 'Packaged executable is missing.'
           }
-          if (-not (Test-Path "$unpack/coreclr.dll")) {
+          if (-not (Test-Path "$unpack/VideoTriage.App/coreclr.dll")) {
             throw 'Packaged app is not self-contained.'
           }
           if (Get-ChildItem $unpack -Recurse -File |
