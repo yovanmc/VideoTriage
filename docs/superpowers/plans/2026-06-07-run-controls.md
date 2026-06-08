@@ -25,6 +25,28 @@
 
 This plan controls an existing pipeline and queue. It does not add settings persistence or summary UI.
 
+## Execution Corrections
+
+These corrections are authoritative where task snippets below differ from current `main`:
+
+- `MainViewModel` already has folder scanning dependencies. Add run-control dependencies after the
+  existing constructor parameters: `ITriagePipelineProvider` and `Func<TriageOptions>`. Keep existing
+  scan tests working by allowing tests to pass these explicitly where run commands are exercised.
+- `SelectedFolder` is currently set only by folder selection. For run-control command state and
+  tests, make its setter public and notify `StartCommand` when it changes. Do not bypass the dialog
+  in production behavior.
+- `IFolderProbeScanner.ScanAsync` returns `Task<IReadOnlyList<ProbeResult>>` and accepts
+  `(string folderPath, TriageOptions? options = null, bool recursive = false,
+  IProgress<ProbeResult>? progress = null, CancellationToken cancellationToken = default)`. Any
+  no-op scanner fake must match this exact signature.
+- Use the same deterministic dispatch pattern introduced by the queue UI milestone:
+  `InlineProgress<FileProgress>` calling `_dispatcher.Post(...)`. Do not use `Progress<T>`, whose
+  callbacks can run after command tasks complete.
+- Format all progress and saved-percent text with `CultureInfo.InvariantCulture`.
+- Task 1 green command should run `FileItemViewModelProgressTests`, not `MainViewModelRunTests`.
+- Update `ServiceCollectionExtensions` so the registered `MainViewModel` receives the real
+  `ITriagePipelineProvider` and `Func<TriageOptions>`.
+
 ## File Structure
 
 ```text
