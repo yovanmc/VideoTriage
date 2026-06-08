@@ -28,13 +28,16 @@ public sealed class MainViewModel : ObservableObject
         IUiDispatcher dispatcher,
         IPrerequisiteService prerequisiteService,
         ITriagePipelineProvider? pipelineProvider = null,
-        Func<TriageOptions>? optionsFactory = null)
+        Func<TriageOptions>? optionsFactory = null,
+        SettingsViewModel? settings = null)
     {
         _scanner = scanner;
         _dialogService = dialogService;
         _dispatcher = dispatcher;
         _pipelineProvider = pipelineProvider;
-        _optionsFactory = optionsFactory ?? (() => new TriageOptions());
+        Settings = settings;
+        _optionsFactory = optionsFactory
+            ?? (settings is null ? () => new TriageOptions() : settings.ToTriageOptions);
         Prerequisites = prerequisiteService.Check();
         ChooseFolderCommand = new AsyncRelayCommand(
             ChooseFolderAsync,
@@ -45,10 +48,13 @@ public sealed class MainViewModel : ObservableObject
         StopCommand = new RelayCommand(
             Stop,
             () => RunState is RunState.Running or RunState.Paused);
+        if (settings is not null)
+            settings.PropertyChanged += (_, _) => StartCommand.NotifyCanExecuteChanged();
     }
 
     public ObservableCollection<FileItemViewModel> Items { get; } = [];
     public IReadOnlyList<ToolPrerequisiteStatus> Prerequisites { get; }
+    public SettingsViewModel? Settings { get; }
     public IAsyncRelayCommand ChooseFolderCommand { get; }
     public IAsyncRelayCommand StartCommand { get; }
     public IRelayCommand PauseCommand { get; }
@@ -126,7 +132,8 @@ public sealed class MainViewModel : ObservableObject
         !IsScanning &&
         RunState == RunState.Idle &&
         !string.IsNullOrWhiteSpace(SelectedFolder) &&
-        _pipelineProvider?.Pipeline is not null;
+        _pipelineProvider?.Pipeline is not null &&
+        (Settings?.CanRun ?? true);
 
     private async Task StartAsync()
     {
