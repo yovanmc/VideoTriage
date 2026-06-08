@@ -77,6 +77,11 @@
 
                     <Separator Margin="0,20,0,16" />
                     <views:SettingsView DataContext="{Binding Settings}" />
+                    <Expander Margin="0,16,0,0"
+                              Header="{Binding Diagnostics.ErrorCount,
+                                  StringFormat=Diagnostics ({0})}">
+                        <views:DiagnosticsView DataContext="{Binding Diagnostics}" />
+                    </Expander>
                 </StackPanel>
                 </ScrollViewer>
             </Border>
@@ -250,8 +255,13 @@
                 Padding="18,0"
                 BorderBrush="#22000000"
                 BorderThickness="0,1,0,0">
-            <TextBlock VerticalAlignment="Center"
-                       Text="{Binding Items.Count, StringFormat=Queue: {0} files}" />
+            <Grid>
+                <TextBlock VerticalAlignment="Center"
+                           Text="{Binding Items.Count, StringFormat=Queue: {0} files}" />
+                <TextBlock HorizontalAlignment="Right"
+                           VerticalAlignment="Center"
+                           Text="{Binding StatusMessage}" />
+            </Grid>
         </Border>
     </Grid>
 </ui:FluentWindow>

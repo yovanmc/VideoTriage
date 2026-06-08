@@ -16,6 +16,8 @@ public sealed class MainViewModel : ObservableObject
     private readonly IUiDispatcher _dispatcher;
     private readonly ITriagePipelineProvider? _pipelineProvider;
     private readonly Func<TriageOptions> _optionsFactory;
+    private readonly IAppLog? _appLog;
+    private readonly IUserErrorSink? _userErrors;
     private CancellationTokenSource? _runCts;
     private PauseToken? _pauseToken;
     private string? _lastRunDataDirectory;
@@ -23,6 +25,7 @@ public sealed class MainViewModel : ObservableObject
     private string? _selectedFolder;
     private bool _isScanning;
     private RunState _runState = RunState.Idle;
+    private string? _statusMessage;
 
     public MainViewModel(
         IFolderProbeScanner? scanner,
@@ -31,13 +34,19 @@ public sealed class MainViewModel : ObservableObject
         IPrerequisiteService prerequisiteService,
         ITriagePipelineProvider? pipelineProvider = null,
         Func<TriageOptions>? optionsFactory = null,
-        SettingsViewModel? settings = null)
+        SettingsViewModel? settings = null,
+        IAppLog? appLog = null,
+        IUserErrorSink? userErrors = null,
+        DiagnosticsViewModel? diagnostics = null)
     {
         _scanner = scanner;
         _dialogService = dialogService;
         _dispatcher = dispatcher;
         _pipelineProvider = pipelineProvider;
+        _appLog = appLog;
+        _userErrors = userErrors;
         Settings = settings;
+        Diagnostics = diagnostics;
         _optionsFactory = optionsFactory
             ?? (settings is null ? () => new TriageOptions() : settings.ToTriageOptions);
         Prerequisites = prerequisiteService.Check();
@@ -61,6 +70,7 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<FileItemViewModel> Items { get; } = [];
     public IReadOnlyList<ToolPrerequisiteStatus> Prerequisites { get; }
     public SettingsViewModel? Settings { get; }
+    public DiagnosticsViewModel? Diagnostics { get; }
     public IAsyncRelayCommand ChooseFolderCommand { get; }
     public IAsyncRelayCommand StartCommand { get; }
     public IRelayCommand PauseCommand { get; }
@@ -115,6 +125,12 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    public string? StatusMessage
+    {
+        get => _statusMessage;
+        private set => SetProperty(ref _statusMessage, value);
+    }
+
     public async Task ChooseFolderAsync()
     {
         if (_scanner is null || IsScanning)
@@ -165,6 +181,7 @@ public sealed class MainViewModel : ObservableObject
         _pauseToken = new PauseToken();
         _lastRunDataDirectory = null;
         LastSummary = null;
+        StatusMessage = null;
         OpenDataDirectoryCommand.NotifyCanExecuteChanged();
         RunState = RunState.Running;
         try
@@ -189,6 +206,20 @@ public sealed class MainViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
+            StatusMessage =
+                "Run stopped. Completed replacements may remain; review the queue before retrying.";
+        }
+        catch (Exception exception)
+        {
+            _appLog?.Error(exception, $"Video triage failed for '{SelectedFolder}'.");
+            _userErrors?.Add(
+                UserErrorSeverity.Error,
+                "Run failed",
+                "VideoTriage stopped unexpectedly. Completed replacements may already be present. " +
+                $"Review the queue and log before retrying: {_appLog?.CurrentLogPath ?? "log unavailable"}",
+                exception.Message);
+            Diagnostics?.Refresh();
+            StatusMessage = "Run failed. See Diagnostics for details.";
         }
         finally
         {
