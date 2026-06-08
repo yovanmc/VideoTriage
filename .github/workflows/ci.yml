@@ -2,9 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   build-and-test:
@@ -18,10 +21,147 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore
-        run: dotnet restore VideoTriage.sln
+        shell: pwsh
+        run: |
+          dotnet restore src/VideoTriage.App/VideoTriage.App.csproj
+          dotnet restore src/VideoTriage.Cli/VideoTriage.Cli.csproj
+          dotnet restore tests/VideoTriage.Core.Tests/VideoTriage.Core.Tests.csproj
+          dotnet restore tests/VideoTriage.App.Tests/VideoTriage.App.Tests.csproj
 
       - name: Build
-        run: dotnet build VideoTriage.sln -c Release --no-restore
+        shell: pwsh
+        run: |
+          dotnet build src/VideoTriage.App/VideoTriage.App.csproj -c Release --no-restore
+          dotnet build src/VideoTriage.Cli/VideoTriage.Cli.csproj -c Release --no-restore
+          dotnet build tests/VideoTriage.Core.Tests/VideoTriage.Core.Tests.csproj -c Release --no-restore
+          dotnet build tests/VideoTriage.App.Tests/VideoTriage.App.Tests.csproj -c Release --no-restore
 
       - name: Test
-        run: dotnet test tests/VideoTriage.Core.Tests -c Release --no-build --verbosity normal
+        shell: pwsh
+        run: |
+          dotnet test tests/VideoTriage.Core.Tests/VideoTriage.Core.Tests.csproj -c Release --no-build --verbosity normal
+          dotnet test tests/VideoTriage.App.Tests/VideoTriage.App.Tests.csproj -c Release --no-build --verbosity normal
+
+  package:
+    runs-on: windows-2025-vs2026
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Verify Windows SDK
+        shell: pwsh
+        run: |
+          $sdk = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\Platforms\UAP\10.0.26100.0\Platform.xml'
+          if (-not (Test-Path $sdk)) {
+            throw 'Windows SDK 10.0.26100.0 is required to build the VideoTriage package.'
+          }
+
+      - name: Create disposable development certificate
+        shell: pwsh
+        env:
+          PACKAGE_PASSWORD: VideoTriage-CI-Development-Only
+        run: |
+          pwsh -NoProfile -File build/New-DevelopmentPackageCertificate.ps1 `
+            -Password $env:PACKAGE_PASSWORD
+
+      - name: Restore package project
+        shell: pwsh
+        run: |
+          dotnet restore src/VideoTriage.App/VideoTriage.App.csproj `
+            --runtime win-x64 `
+            -p:Platform=x64
+          msbuild src/VideoTriage.Package/VideoTriage.Package.wapproj `
+            /t:Restore `
+            /m:1 `
+            /nodeReuse:false `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /p:RuntimeIdentifier=win-x64
+
+      - name: Build signed x64 MSIX
+        shell: pwsh
+        env:
+          PACKAGE_PASSWORD: VideoTriage-CI-Development-Only
+        run: |
+          $pfx = (Resolve-Path 'artifacts/package-signing/VideoTriage.Development.pfx').Path
+          $packageDir = Join-Path (Resolve-Path 'artifacts').Path 'msix\'
+          msbuild src/VideoTriage.Package/VideoTriage.Package.wapproj `
+            /m:1 `
+            /nodeReuse:false `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /p:RuntimeIdentifier=win-x64 `
+            /p:UapAppxPackageBuildMode=SideLoadOnly `
+            /p:GenerateAppInstallerFile=false `
+            /p:AppxBundle=Never `
+            /p:AppxPackageDir="$packageDir" `
+            /p:PackageCertificateKeyFile="$pfx" `
+            /p:PackageCertificatePassword="$env:PACKAGE_PASSWORD"
+
+      - name: Inspect package
+        shell: pwsh
+        run: |
+          $packages = @(Get-ChildItem artifacts/msix -Recurse -Filter '*.msix')
+          if ($packages.Count -ne 1) {
+            throw "Expected exactly one MSIX, found $($packages.Count)."
+          }
+
+          $makeAppx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
+            -Recurse -Filter makeappx.exe |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $makeAppx) {
+            throw 'makeappx.exe was not found.'
+          }
+
+          $unpack = 'artifacts/msix-inspect'
+          & $makeAppx.FullName unpack /p $packages[0].FullName /d $unpack /o
+
+          [xml]$manifest = Get-Content -Raw "$unpack/AppxManifest.xml"
+          if ($manifest.Package.Identity.Name -ne 'YovanMc.VideoTriage') {
+            throw 'Built package identity is wrong.'
+          }
+          if ($manifest.Package.Identity.ProcessorArchitecture -ne 'x64') {
+            throw 'Built package is not x64.'
+          }
+          if (-not (Test-Path "$unpack/VideoTriage.App/VideoTriage.App.exe")) {
+            throw 'Packaged executable is missing.'
+          }
+          if (-not (Test-Path "$unpack/VideoTriage.App/coreclr.dll")) {
+            throw 'Packaged app is not self-contained.'
+          }
+          if (Get-ChildItem $unpack -Recurse -File |
+              Where-Object Name -Match '^(ffmpeg|ffprobe|HandBrakeCLI)\.exe$') {
+            throw 'An external media tool was bundled.'
+          }
+
+      - name: Stage public package artifact
+        shell: pwsh
+        run: |
+          $msix = @(Get-ChildItem artifacts/msix -Recurse -Filter '*.msix')
+          if ($msix.Count -ne 1) {
+            throw "Expected exactly one MSIX, found $($msix.Count)."
+          }
+          New-Item -ItemType Directory -Force artifacts/upload | Out-Null
+          Copy-Item $msix[0].FullName artifacts/upload/
+          Copy-Item artifacts/package-signing/VideoTriage.Development.cer artifacts/upload/
+          Copy-Item docs/installation.md artifacts/upload/
+          Remove-Item artifacts/package-signing/VideoTriage.Development.pfx -Force
+          if (Get-ChildItem artifacts/upload -Filter '*.pfx') {
+            throw 'Private signing material entered the upload directory.'
+          }
+
+      - name: Upload MSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: VideoTriage-win-x64-msix
+          path: artifacts/upload/
+          if-no-files-found: error

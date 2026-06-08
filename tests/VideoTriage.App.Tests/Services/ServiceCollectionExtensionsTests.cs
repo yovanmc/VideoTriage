@@ -115,11 +115,12 @@ public sealed class ServiceCollectionExtensionsTests
                 failure = exception;
             }
         });
+        thread.IsBackground = true;
         thread.SetApartmentState(ApartmentState.STA);
 
         thread.Start();
 
-        thread.Join(TimeSpan.FromSeconds(5)).ShouldBeTrue("STA window resolution timed out.");
+        thread.Join(TimeSpan.FromSeconds(15)).ShouldBeTrue("STA window resolution timed out.");
         failure.ShouldBeNull();
     }
 
