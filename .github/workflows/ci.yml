@@ -43,7 +43,7 @@ jobs:
           dotnet test tests/VideoTriage.App.Tests/VideoTriage.App.Tests.csproj -c Release --no-build --verbosity normal
 
   package:
-    runs-on: windows-latest
+    runs-on: windows-2025-vs2026
     needs: build-and-test
     steps:
       - uses: actions/checkout@v4
@@ -75,6 +75,9 @@ jobs:
       - name: Restore package project
         shell: pwsh
         run: |
+          dotnet restore src/VideoTriage.App/VideoTriage.App.csproj `
+            --runtime win-x64 `
+            -p:Platform=x64
           msbuild src/VideoTriage.Package/VideoTriage.Package.wapproj `
             /t:Restore `
             /m:1 `
