@@ -212,7 +212,8 @@ Create `src/VideoTriage.App/Properties/PublishProfiles/win-x64.pubxml`:
 <Project>
   <PropertyGroup>
     <Configuration>Release</Configuration>
-    <Platform>Any CPU</Platform>
+    <Platform>x64</Platform>
+    <PlatformTarget>x64</PlatformTarget>
     <PublishProtocol>FileSystem</PublishProtocol>
     <TargetFramework>net10.0-windows</TargetFramework>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
