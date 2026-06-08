@@ -7,6 +7,14 @@ namespace VideoTriage.Core.Tests.Tools;
 public sealed class ToolLocatorTests
 {
     [Fact]
+    public void ToolLocator_ImplementsIToolLocator()
+    {
+        IToolLocator locator = new ToolLocator(string.Empty);
+
+        locator.FindOnPath("ffmpeg").ShouldBeNull();
+    }
+
+    [Fact]
     public void FindOnPath_FindsExecutableInInjectedPath()
     {
         using var temp = new TempDirectory();

@@ -1,6 +1,6 @@
 namespace VideoTriage.Core.Tools;
 
-public sealed class ToolLocator
+public sealed class ToolLocator : IToolLocator
 {
     private readonly string? _pathOverride;
 
