@@ -7,6 +7,7 @@ using VideoTriage.App.ViewModels;
 using VideoTriage.App.Views;
 using VideoTriage.Core.Encoding;
 using VideoTriage.Core.FileSystem;
+using VideoTriage.Core.Models;
 using VideoTriage.Core.Pipeline;
 using VideoTriage.Core.Probing;
 using VideoTriage.Core.Replace;
@@ -97,7 +98,9 @@ public static class ServiceCollectionExtensions
                 scanner,
                 sp.GetRequiredService<IDialogService>(),
                 sp.GetRequiredService<IUiDispatcher>(),
-                prerequisiteService);
+                prerequisiteService,
+                sp.GetRequiredService<ITriagePipelineProvider>(),
+                () => new TriageOptions());
         });
         services.AddSingleton<MainWindow>();
 
