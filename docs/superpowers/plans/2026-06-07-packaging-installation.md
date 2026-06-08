@@ -40,6 +40,17 @@ CI signing: generated self-signed certificate, private PFX deleted after packagi
 External tools: prerequisites only; never package ffmpeg, ffprobe, or HandBrakeCLI
 ```
 
+## Execution Corrections
+
+- Completed-file state, result logs, and deletion manifests are stored under
+  `<selected folder>\_videotriage_data` by default, not under LocalAppData.
+- Cancellation or a later run failure may occur after earlier files completed replacement. Document
+  the per-file safety guarantee accurately: no original is removed for a file until its smaller
+  replacement passes enabled verification; completed replacements may remain after cancellation.
+- Local package construction requires the fixed Windows SDK `10.0.26100.0`. If it is unavailable,
+  complete and verify all repository artifacts and CI policy without changing the target SDK, then
+  report local MSIX build/install verification as blocked by that machine prerequisite.
+
 ## File Structure
 
 ```text
