@@ -21,18 +21,29 @@ namespace VideoTriage.App.Services;
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddVideoTriage(this IServiceCollection services) =>
-        services.AddVideoTriageCore();
+        services.AddVideoTriageCore(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "VideoTriage",
+            "settings.json"));
 
     public static IServiceCollection AddVideoTriageForTests(this IServiceCollection services) =>
-        services.AddVideoTriageCore();
+        services.AddVideoTriageCore(Path.Combine(
+            Path.GetTempPath(),
+            "VideoTriage.Tests",
+            Guid.NewGuid().ToString("N"),
+            "settings.json"));
 
-    private static IServiceCollection AddVideoTriageCore(this IServiceCollection services)
+    private static IServiceCollection AddVideoTriageCore(
+        this IServiceCollection services,
+        string settingsPath)
     {
         services.TryAddSingleton<IToolLocator, ToolLocator>();
         services.AddSingleton<IPrerequisiteService, PrerequisiteService>();
         services.TryAddSingleton<IDialogService, DialogService>();
         services.TryAddSingleton<IUiDispatcher>(
             _ => new UiDispatcher(Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher));
+        services.TryAddSingleton<ISettingsStore>(_ => new JsonSettingsStore(settingsPath));
+        services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<IProcessRunner, ProcessRunner>();
         services.AddSingleton<IFileSystem, PhysicalFileSystem>();
         services.AddSingleton<IVideoFileDiscovery, VideoFileDiscovery>();
@@ -97,13 +108,14 @@ public static class ServiceCollectionExtensions
                     sp.GetRequiredService<IVideoClassifier>());
             }
 
+            var settings = sp.GetRequiredService<SettingsViewModel>();
             return new MainViewModel(
                 scanner,
                 sp.GetRequiredService<IDialogService>(),
                 sp.GetRequiredService<IUiDispatcher>(),
                 prerequisiteService,
                 sp.GetRequiredService<ITriagePipelineProvider>(),
-                () => new TriageOptions());
+                settings: settings);
         });
         services.AddSingleton<MainWindow>();
 

@@ -1,4 +1,5 @@
 using Shouldly;
+using VideoTriage.App.Models;
 using VideoTriage.App.Services;
 using VideoTriage.App.Tests.Fakes;
 using VideoTriage.App.ViewModels;
@@ -75,16 +76,55 @@ public sealed class MainViewModelRunTests
         vm.ChooseFolderCommand.CanExecute(null).ShouldBeTrue();
     }
 
+    [Fact]
+    public async Task StartCommand_UsesCurrentValidatedSettings()
+    {
+        var pipeline = new CapturingTriagePipeline();
+        var settings = new SettingsViewModel(new StubSettingsStore())
+        {
+            CandidateBppThreshold = 0.24,
+            MinimumFreeGigabytes = 8,
+            DryRun = true
+        };
+        var vm = MakeViewModel(pipeline, settings: settings);
+        vm.SelectedFolder = @"C:\Videos";
+
+        await vm.StartCommand.ExecuteAsync(null);
+
+        pipeline.Options.ShouldNotBeNull();
+        pipeline.Options.CandidateBppThreshold.ShouldBe(0.24);
+        pipeline.Options.MinimumFreeGigabytes.ShouldBe(8);
+        pipeline.Options.DryRun.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void StartCommand_UnconfirmedPermanentDelete_CannotExecute()
+    {
+        var settings = new SettingsViewModel(new StubSettingsStore())
+        {
+            DeleteMode = DeleteMode.Permanent
+        };
+        var vm = MakeViewModel(new FakeTriagePipeline([]), settings: settings);
+        vm.SelectedFolder = @"C:\Videos";
+
+        vm.StartCommand.CanExecute(null).ShouldBeFalse();
+
+        settings.ConfirmPermanentDelete = true;
+        vm.StartCommand.CanExecute(null).ShouldBeTrue();
+    }
+
     private static MainViewModel MakeViewModel(
         ITriagePipeline? pipeline,
-        IUiDispatcher? dispatcher = null) =>
+        IUiDispatcher? dispatcher = null,
+        SettingsViewModel? settings = null) =>
         new(
             scanner: new NoopFolderProbeScanner(),
             new FakeDialogService(),
             dispatcher ?? new RecordingUiDispatcher(),
             new AvailablePrerequisiteService(),
             new StubPipelineProvider(pipeline),
-            () => new TriageOptions());
+            settings is null ? () => new TriageOptions() : null,
+            settings);
 
     private sealed class StubPipelineProvider(ITriagePipeline? pipeline) : ITriagePipelineProvider
     {
@@ -110,5 +150,28 @@ public sealed class MainViewModelRunTests
             new("ffmpeg", true, @"C:\tools\ffmpeg.exe", ""),
             new("HandBrakeCLI", true, @"C:\tools\HandBrakeCLI.exe", "")
         ];
+    }
+
+    private sealed class StubSettingsStore : ISettingsStore
+    {
+        public AppSettings Load() => new();
+        public void Save(AppSettings settings) { }
+    }
+
+    private sealed class CapturingTriagePipeline : ITriagePipeline
+    {
+        public TriageOptions? Options { get; private set; }
+
+        public Task<TriageSummary> RunAsync(
+            string folder,
+            TriageOptions options,
+            bool recursive = false,
+            IProgress<FileProgress>? progress = null,
+            PauseToken? pauseToken = null,
+            CancellationToken cancellationToken = default)
+        {
+            Options = options;
+            return Task.FromResult(FakeTriagePipeline.EmptySummary());
+        }
     }
 }
