@@ -38,12 +38,16 @@ Only after all eight gates pass does `SafeReplacer` ask `FileRemover` to remove 
 - Pause is cooperative and is currently checked once, immediately after each file is discovered.
   It prevents that file from proceeding until Resume, but it does not suspend a file that is
   already probing, encoding, verifying, embedding a poster, or replacing.
-- Stop requests cancellation. When an external process is active, `ProcessRunner` kills its process
-  tree and waits for exit. Cleanup is best effort: poster work files and verifier stderr files have
-  dedicated cleanup, and the pipeline removes an encode temp when cancellation propagates through
-  its protected processing block. Other interrupted or failed paths can leave temporary files.
-- Cancellation does not roll back replacements completed earlier in the run. For a file that has
-  not reached original removal, cancellation leaves the original untouched.
+- Stop requests cancellation and takes effect at the next cancellation boundary. Cancellation-aware
+  external processing is stopped; when `ProcessRunner` observes cancellation, it kills the active
+  process tree and waits for exit. Cleanup is best effort: poster work files and verifier stderr
+  files have dedicated cleanup, and the pipeline removes an encode temp when cancellation
+  propagates through its protected processing block. Other interrupted or failed paths can leave
+  temporary files.
+- Once the synchronous `SafeReplacer` replacement has begun, Stop cannot interrupt it. The file may
+  finish as a completed replacement, a `ReplacePartial`, or an exception requiring manual
+  inspection. Cancellation does not roll back replacements completed earlier in the run, so review
+  completion and partial outcomes before retrying.
 
 ## Partial Replacement Recovery
 
