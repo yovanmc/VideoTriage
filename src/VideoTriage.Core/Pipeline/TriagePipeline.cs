@@ -1,6 +1,7 @@
 using VideoTriage.Core.Encoding;
 using VideoTriage.Core.FileSystem;
 using VideoTriage.Core.Models;
+using VideoTriage.Core.Poster;
 using VideoTriage.Core.Probing;
 using VideoTriage.Core.Replace;
 using VideoTriage.Core.State;
@@ -24,7 +25,8 @@ public sealed class TriagePipeline(
     IFileSystem fileSystem,
     Func<string, ICompletedFileStore> completedStoreFactory,
     Func<string, IDeleteManifest> deleteManifestFactory,
-    Func<string, IResultLog> resultLogFactory) : ITriagePipeline
+    Func<string, IResultLog> resultLogFactory,
+    IPosterEmbedder? posterEmbedder = null) : ITriagePipeline
 {
     public async Task<TriageSummary> RunAsync(
         string folder,
@@ -234,10 +236,28 @@ public sealed class TriagePipeline(
                     continue;
                 }
 
-                var outputBytes = fileSystem.GetFileLength(encodePath);
+                var replacementPath = encodePath;
+                if (options.EmbedPoster && posterEmbedder is not null)
+                {
+                    Report(path, TriagePhase.EmbeddingPoster);
+                    var poster = await posterEmbedder.EmbedAsync(
+                        encodePath,
+                        probe.Stats,
+                        options,
+                        cancellationToken);
+                    replacementPath = poster.OutputPath;
+                }
+
+                var outputBytes = fileSystem.GetFileLength(replacementPath);
                 if (outputBytes >= probe.Stats.FileSizeBytes)
                 {
-                    fileSystem.DeleteFile(encodePath);
+                    if (fileSystem.FileExists(replacementPath))
+                        fileSystem.DeleteFile(replacementPath);
+                    if (!string.Equals(replacementPath, encodePath, StringComparison.OrdinalIgnoreCase) &&
+                        fileSystem.FileExists(encodePath))
+                    {
+                        fileSystem.DeleteFile(encodePath);
+                    }
                     Complete(
                         path,
                         TriageOutcome.GrewKeptOriginal,
@@ -247,12 +267,23 @@ public sealed class TriagePipeline(
                     continue;
                 }
 
+                if (!string.Equals(replacementPath, encodePath, StringComparison.OrdinalIgnoreCase) &&
+                    fileSystem.FileExists(encodePath))
+                {
+                    fileSystem.DeleteFile(encodePath);
+                }
+
                 Report(path, TriagePhase.Replacing);
-                var replace = replacer.Replace(path, encodePath, options.DeleteMode);
+                var replace = replacer.Replace(path, replacementPath, options.DeleteMode);
                 if (!replace.Succeeded)
                 {
-                    if (fileSystem.FileExists(encodePath))
+                    if (fileSystem.FileExists(replacementPath))
+                        fileSystem.DeleteFile(replacementPath);
+                    if (!string.Equals(replacementPath, encodePath, StringComparison.OrdinalIgnoreCase) &&
+                        fileSystem.FileExists(encodePath))
+                    {
                         fileSystem.DeleteFile(encodePath);
+                    }
                     Complete(
                         path,
                         TriageOutcome.EncodeFailed,
@@ -262,7 +293,7 @@ public sealed class TriagePipeline(
                     continue;
                 }
 
-                // SafeReplacer MOVED the encode temp into staging/final, so do NOT delete encodePath here.
+                // SafeReplacer consumed replacementPath into staging/final.
                 var savedPercent =
                     (probe.Stats.FileSizeBytes - outputBytes) / (double)probe.Stats.FileSizeBytes * 100;
                 Complete(

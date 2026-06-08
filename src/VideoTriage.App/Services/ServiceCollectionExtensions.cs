@@ -9,6 +9,7 @@ using VideoTriage.Core.Encoding;
 using VideoTriage.Core.FileSystem;
 using VideoTriage.Core.Models;
 using VideoTriage.Core.Pipeline;
+using VideoTriage.Core.Poster;
 using VideoTriage.Core.Probing;
 using VideoTriage.Core.Replace;
 using VideoTriage.Core.State;
@@ -58,6 +59,7 @@ public static class ServiceCollectionExtensions
                 runner,
                 sp.GetRequiredService<FfprobeJsonParser>());
             var verifier = new OutputVerifier(paths["ffmpeg"], runner, ffprobe);
+            var posterEmbedder = new PosterEmbedder(paths["ffmpeg"], runner, verifier);
             var encoder = new HandBrakeEncoder(
                 paths["HandBrakeCLI"],
                 runner,
@@ -73,7 +75,8 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<IFileSystem>(),
                 sp.GetRequiredService<Func<string, ICompletedFileStore>>(),
                 sp.GetRequiredService<Func<string, IDeleteManifest>>(),
-                sp.GetRequiredService<Func<string, IResultLog>>());
+                sp.GetRequiredService<Func<string, IResultLog>>(),
+                posterEmbedder);
             return new TriagePipelineProvider(pipeline);
         });
         services.AddSingleton(sp =>
