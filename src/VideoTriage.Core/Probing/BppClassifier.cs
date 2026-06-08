@@ -3,7 +3,7 @@ using VideoTriage.Core.Models;
 
 namespace VideoTriage.Core.Probing;
 
-public sealed class BppClassifier
+public sealed class BppClassifier : IVideoClassifier
 {
     public ClassificationResult Classify(VideoStats stats, TriageOptions? options = null)
     {
