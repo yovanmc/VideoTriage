@@ -12,6 +12,9 @@ TestResults/
 *.log
 .worktrees/
 
+# Package signing private keys
+*.pfx
+
 ## Rider/VS
 .idea/
 
