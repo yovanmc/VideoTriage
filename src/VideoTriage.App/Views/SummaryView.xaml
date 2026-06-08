@@ -1,0 +1,67 @@
+<UserControl x:Class="VideoTriage.App.Views.SummaryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:VideoTriage.App.Controls">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Run complete"
+                   FontSize="28"
+                   FontWeight="SemiBold" />
+
+        <Grid Grid.Row="1" Margin="0,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="220" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <controls:DonutChart Width="180"
+                                 Height="180"
+                                 ItemsSource="{Binding Segments}" />
+
+            <UniformGrid Grid.Column="1" Columns="2" Margin="28,0,0,0">
+                <StackPanel Margin="8">
+                    <TextBlock Text="Space saved" Opacity="0.65" />
+                    <TextBlock Text="{Binding BytesSavedText}" FontSize="24" />
+                </StackPanel>
+                <StackPanel Margin="8">
+                    <TextBlock Text="Processed" Opacity="0.65" />
+                    <TextBlock Text="{Binding ProcessedCount}" FontSize="24" />
+                </StackPanel>
+                <StackPanel Margin="8">
+                    <TextBlock Text="Kept" Opacity="0.65" />
+                    <TextBlock Text="{Binding KeptCount}" FontSize="24" />
+                </StackPanel>
+                <StackPanel Margin="8">
+                    <TextBlock Text="Average reduction" Opacity="0.65" />
+                    <TextBlock Text="{Binding AverageReductionText}" FontSize="24" />
+                </StackPanel>
+            </UniformGrid>
+        </Grid>
+
+        <DataGrid Grid.Row="2"
+                  ItemsSource="{Binding Files}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  CanUserAddRows="False">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="File"
+                                    Binding="{Binding FilePath}"
+                                    Width="2*" />
+                <DataGridTextColumn Header="Outcome"
+                                    Binding="{Binding Outcome}"
+                                    Width="Auto" />
+                <DataGridTextColumn Header="Saved"
+                                    Binding="{Binding SavedPercent}"
+                                    Width="Auto" />
+                <DataGridTextColumn Header="Message"
+                                    Binding="{Binding Message}"
+                                    Width="3*" />
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</UserControl>
