@@ -58,6 +58,19 @@ public sealed class JsonLinesCompletedFileStoreTests : IDisposable
         new JsonLinesCompletedFileStore(path).Load().Count.ShouldBe(1);
     }
 
+    [Fact]
+    public void Load_EntryWithoutUsableSourcePath_IgnoresEntry()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(
+            path,
+            """
+            {"sourcePath":null,"sourceLength":1,"sourceLastWriteUtc":"2026-01-01T00:00:00+00:00","outcome":9,"completedAtUtc":"2026-01-02T00:00:00+00:00"}
+            """);
+
+        new JsonLinesCompletedFileStore(path).Load().ShouldBeEmpty();
+    }
+
     private static CompletedFileEntry Entry(string path, long length, DateTimeOffset lastWrite) => new()
     {
         SourcePath = path,

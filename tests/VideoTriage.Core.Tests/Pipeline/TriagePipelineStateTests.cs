@@ -64,6 +64,18 @@ public sealed class TriagePipelineStateTests
     }
 
     [Fact]
+    public async Task RunAsync_InvalidCompletedPath_DoesNotBlockRun()
+    {
+        var fakes = PipelineStateFakes.WithSuccessfulReplacement();
+        fakes.AddCompletedEntry(sourceLength: fakes.SourceBytes, sourcePath: "\0");
+
+        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+
+        fakes.ProbeCalls.ShouldBe(1);
+        fakes.CompletedAppends.Single().Outcome.ShouldBe(TriageOutcome.Replaced);
+    }
+
+    [Fact]
     public async Task RunAsync_Replaced_AppendsCompletedManifestAndResult()
     {
         var fakes = PipelineStateFakes.WithSuccessfulReplacement();
@@ -206,11 +218,11 @@ public sealed class TriagePipelineStateTests
             return fakes;
         }
 
-        public void AddCompletedEntry(long sourceLength)
+        public void AddCompletedEntry(long sourceLength, string sourcePath = FilePath)
         {
             _preloaded.Add(new CompletedFileEntry
             {
-                SourcePath = FilePath,
+                SourcePath = sourcePath,
                 SourceLength = sourceLength,
                 SourceLastWriteUtc = SourceLastWrite,
                 Outcome = TriageOutcome.Replaced,

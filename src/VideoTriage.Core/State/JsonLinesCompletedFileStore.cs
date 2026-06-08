@@ -22,7 +22,8 @@ public sealed class JsonLinesCompletedFileStore(string path) : ICompletedFileSto
             try
             {
                 var entry = JsonSerializer.Deserialize<CompletedFileEntry>(line, Options);
-                if (entry is not null) entries.Add(entry);
+                if (entry is not null && !string.IsNullOrWhiteSpace(entry.SourcePath))
+                    entries.Add(entry);
             }
             catch (JsonException)
             {

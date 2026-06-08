@@ -51,7 +51,10 @@ public sealed class TriagePipeline(
             resultLog = resultLogFactory(dataDirectory);
 
             foreach (var entry in completedStore.Load())
-                completedByPath[Path.GetFullPath(entry.SourcePath)] = entry;
+            {
+                if (TryNormalizePath(entry.SourcePath, out var normalizedPath))
+                    completedByPath[normalizedPath] = entry;
+            }
         }
 
         void Report(string path, TriagePhase phase, double? encodeProgress = null) =>
@@ -295,6 +298,21 @@ public sealed class TriagePipeline(
 
     private static Task WaitWhilePausedAsync(PauseToken? pauseToken, CancellationToken cancellationToken) =>
         pauseToken?.WaitWhilePausedAsync(cancellationToken) ?? Task.CompletedTask;
+
+    private static bool TryNormalizePath(string path, out string normalizedPath)
+    {
+        try
+        {
+            normalizedPath = Path.GetFullPath(path);
+            return true;
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            normalizedPath = string.Empty;
+            return false;
+        }
+    }
 
     private static TriageOutcome MapSkip(ClassificationOutcome outcome) => outcome switch
     {
