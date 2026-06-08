@@ -48,15 +48,18 @@ Only after all eight gates pass does `SafeReplacer` ask `FileRemover` to remove 
 ## Partial Replacement Recovery
 
 After removal, `SafeReplacer` renames staging to the canonical `.mp4` path. If original removal
-succeeds but that final rename fails with an I/O or access error, it preserves the verified bytes
-as:
+succeeds but that final rename fails with an I/O or access error, VideoTriage attempts to preserve
+the verified staging replacement as:
 
 `<base-name>.videotriage.partial.<process-id>.mp4`
 
-For example, `clip.mov` becomes `clip.videotriage.partial.<process-id>.mp4`. The result is
-`ReplacePartial` with `OriginalRemoved` set to `true`; this is a recoverable partial outcome, not a
-claim that the original still exists. Follow [Install VideoTriage](installation.md#recover-a-partial-replacement)
-to inspect and recover the file.
+For example, `clip.mov` becomes `clip.videotriage.partial.<process-id>.mp4`. When that fallback
+rename succeeds, the result is `ReplacePartial` with `OriginalRemoved` set to `true`; this is a
+recoverable partial outcome, not a claim that the original still exists. If the fallback rename
+also fails, the operation throws and the verified replacement may remain at its
+`.videotriage.staging.<process-id>.mp4` path, requiring manual inspection. Follow
+[Install VideoTriage](installation.md#recover-a-partial-replacement) to inspect and recover a
+successfully preserved partial file.
 
 ## Deletion Modes
 
