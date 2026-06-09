@@ -10,12 +10,13 @@ using VideoTriage.Core.Verify;
 namespace VideoTriage.Core.Pipeline;
 
 /// <summary>
-/// Orchestrates discovery → probe → classify → space → encode → verify → size-check → safe-replace,
+/// Orchestrates discovery → probe → classify → space → encode → verify → size-check → replace,
 /// emitting immutable <see cref="FileProgress"/> events. Every destructive step is gated by
 /// verification and a strict size comparison, and every discovered file receives a terminal event.
 /// The original is never touched on any failure path.
 /// </summary>
 public sealed class TriagePipeline(
+    IRunLeaseFactory runLeaseFactory,
     IVideoFileDiscovery discovery,
     IFfprobeService ffprobe,
     IVideoClassifier classifier,
@@ -26,7 +27,10 @@ public sealed class TriagePipeline(
     Func<string, ICompletedFileStore> completedStoreFactory,
     Func<string, IDeleteManifest> deleteManifestFactory,
     Func<string, IResultLog> resultLogFactory,
-    IPosterEmbedder? posterEmbedder = null) : ITriagePipeline
+    IPosterEmbedder? posterEmbedder = null,
+    Func<string, IReplacementTransactionCoordinator>? coordinatorFactory = null,
+    Func<string, IReplacementRecovery>? recoveryFactory = null,
+    Func<string, IActiveRunJournal>? activeRunJournalFactory = null) : ITriagePipeline
 {
     public async Task<TriageSummary> RunAsync(
         string folder,
@@ -40,9 +44,13 @@ public sealed class TriagePipeline(
 
         var results = new List<FileProgress>();
         var dataDirectory = Path.Combine(folder, options.DataDirectoryName);
+        using var runLease = options.DryRun ? null : runLeaseFactory.Acquire(dataDirectory);
         ICompletedFileStore? completedStore = null;
         IDeleteManifest? deleteManifest = null;
         IResultLog? resultLog = null;
+        IReplacementTransactionCoordinator? coordinator = null;
+        IActiveRunJournal? activeJournal = null;
+        Guid runId = options.DryRun ? Guid.Empty : Guid.NewGuid();
         var completedByPath = new Dictionary<string, CompletedFileEntry>(StringComparer.OrdinalIgnoreCase);
 
         if (!options.DryRun)
@@ -51,6 +59,18 @@ public sealed class TriagePipeline(
             completedStore = completedStoreFactory(dataDirectory);
             deleteManifest = deleteManifestFactory(dataDirectory);
             resultLog = resultLogFactory(dataDirectory);
+
+            if (recoveryFactory is not null)
+            {
+                var recovery = recoveryFactory(dataDirectory).Recover();
+                if (recovery.Unrecoverable.Count > 0)
+                    throw new ReplacementRecoveryRequiredException(recovery.Unrecoverable);
+            }
+
+            if (coordinatorFactory is not null)
+                coordinator = coordinatorFactory(dataDirectory);
+
+            activeJournal = activeRunJournalFactory?.Invoke(dataDirectory);
 
             foreach (var entry in completedStore.Load())
             {
@@ -121,7 +141,10 @@ public sealed class TriagePipeline(
                 });
             }
 
-            if (replace is { OriginalRemoved: true } &&
+            // Only append to pipeline-level manifest when NOT using the transaction coordinator
+            // (which appends to its own manifest internally).
+            if (coordinator is null &&
+                replace is { OriginalRemoved: true } &&
                 source is not null &&
                 finalPath is not null &&
                 outputBytes.HasValue &&
@@ -140,8 +163,31 @@ public sealed class TriagePipeline(
             }
         }
 
-        foreach (var path in discovery.FindVideos(folder, options, recursive))
+        var allFiles = discovery.FindVideos(folder, options, recursive).ToList();
+        var startedAtUtc = DateTimeOffset.UtcNow;
+
+        activeJournal?.Save(new ActiveRunState
         {
+            RunId = runId,
+            Folder = folder,
+            StartedAtUtc = startedAtUtc,
+            CompletedFiles = 0,
+            TotalFiles = allFiles.Count
+        });
+
+        foreach (var path in allFiles)
+        {
+            activeJournal?.Save(new ActiveRunState
+            {
+                RunId = runId,
+                Folder = folder,
+                StartedAtUtc = startedAtUtc,
+                CurrentFile = path,
+                CurrentPhase = TriagePhase.Probing,
+                CompletedFiles = results.Count,
+                TotalFiles = allFiles.Count
+            });
+
             Report(path, TriagePhase.Discovered);
             await WaitWhilePausedAsync(pauseToken, cancellationToken);
 
@@ -202,7 +248,8 @@ public sealed class TriagePipeline(
                 continue;
             }
 
-            var encodePath = TempFileNaming.EncodePath(path, Environment.ProcessId);
+            var transactionId = Guid.NewGuid();
+            var encodePath = TempFileNaming.EncodePath(path, transactionId);
             try
             {
                 Report(path, TriagePhase.Encoding);
@@ -274,26 +321,44 @@ public sealed class TriagePipeline(
                 }
 
                 Report(path, TriagePhase.Replacing);
-                var replace = replacer.Replace(path, replacementPath, options.DeleteMode);
+                ReplaceResult replace;
+                if (coordinator is not null)
+                {
+                    replace = coordinator.Replace(new ReplacementTransactionRequest
+                    {
+                        RunId = runId,
+                        OriginalPath = path,
+                        VerifiedReplacementPath = replacementPath,
+                        OriginalBytes = probe.Stats.FileSizeBytes,
+                        ReplacementBytes = outputBytes,
+                        DeleteMode = options.DeleteMode
+                    });
+                }
+                else
+                {
+                    replace = replacer.Replace(path, replacementPath, options.DeleteMode);
+                }
+
                 if (!replace.Succeeded)
                 {
-                    if (fileSystem.FileExists(replacementPath))
+                    if (coordinator is null && fileSystem.FileExists(replacementPath))
                         fileSystem.DeleteFile(replacementPath);
-                    if (!string.Equals(replacementPath, encodePath, StringComparison.OrdinalIgnoreCase) &&
+                    if (coordinator is null &&
+                        !string.Equals(replacementPath, encodePath, StringComparison.OrdinalIgnoreCase) &&
                         fileSystem.FileExists(encodePath))
                     {
                         fileSystem.DeleteFile(encodePath);
                     }
                     Complete(
                         path,
-                        TriageOutcome.EncodeFailed,
+                        TriageOutcome.ReplaceFailed,
                         replace.Reason,
                         source: probe.Stats,
                         sourceLastWrite: sourceLastWrite);
                     continue;
                 }
 
-                // SafeReplacer consumed replacementPath into staging/final.
+                // Coordinator consumed replacementPath into staging/final.
                 var savedPercent =
                     (probe.Stats.FileSizeBytes - outputBytes) / (double)probe.Stats.FileSizeBytes * 100;
                 Complete(
@@ -322,6 +387,18 @@ public sealed class TriagePipeline(
                     sourceLastWrite: sourceLastWrite);
                 throw;
             }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Unexpected I/O error (e.g. disk full mid-encode, file locked). Clean up the temp
+                // file best-effort and record a per-file failure so the run continues.
+                try { if (fileSystem.FileExists(encodePath)) fileSystem.DeleteFile(encodePath); } catch { }
+                Complete(
+                    path,
+                    TriageOutcome.EncodeFailed,
+                    $"Unexpected I/O failure: {ex.Message}",
+                    source: probe.Stats,
+                    sourceLastWrite: sourceLastWrite);
+            }
             finally
             {
                 // Defensive: clean up encodePath on any unexpected exception. Normal paths (success,
@@ -332,6 +409,7 @@ public sealed class TriagePipeline(
             }
         }
 
+        activeJournal?.Clear();
         return Summarize(results, options);
     }
 
@@ -385,7 +463,7 @@ public sealed class TriagePipeline(
             Marginal = replaced.Count(f => (f.SavedPercent ?? 100) < options.MarginalThresholdPercent),
             Grew = Count(TriageOutcome.GrewKeptOriginal),
             Invalid = Count(TriageOutcome.OutputInvalid, TriageOutcome.InvalidMetadata),
-            Failed = Count(TriageOutcome.EncodeFailed, TriageOutcome.InsufficientSpace, TriageOutcome.Cancelled),
+            Failed = Count(TriageOutcome.EncodeFailed, TriageOutcome.ReplaceFailed, TriageOutcome.InsufficientSpace, TriageOutcome.Cancelled),
             Skipped = Count(
                 TriageOutcome.SkippedAlreadyAv1,
                 TriageOutcome.SkippedLowBpp,

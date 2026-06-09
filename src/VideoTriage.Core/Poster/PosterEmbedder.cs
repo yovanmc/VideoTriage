@@ -19,12 +19,13 @@ public sealed class PosterEmbedder(
         if (!options.EmbedPoster)
             return Original(verifiedEncodePath, "Poster embedding disabled.");
 
+        var posterTxId = Guid.NewGuid();
         var posterPath = TempFileNaming.PosterImagePath(
             verifiedEncodePath,
-            Environment.ProcessId);
+            posterTxId);
         var muxedPath = TempFileNaming.PosterMuxPath(
             verifiedEncodePath,
-            Environment.ProcessId);
+            posterTxId);
         var keepMuxed = false;
         try
         {

@@ -7,8 +7,12 @@ namespace VideoTriage.Core.Tests.Replace;
 
 public sealed class SafeReplacerTests
 {
+    // Fixed transaction ID used for deterministic path assertions in tests.
+    private static readonly Guid TestTxId = Guid.Parse("00000000-0000-0000-0000-000000000042");
+    private const string TestTxN = "00000000000000000000000000000042";
+
     private static SafeReplacer Build(FakeFileSystem fs, FakeFileRemover remover) =>
-        new(fs, remover, () => 42);
+        new(fs, remover, () => TestTxId);
 
     [Fact]
     public void Replace_CandidateNotSmaller_DoesNotRemoveOriginal()
@@ -33,7 +37,7 @@ public sealed class SafeReplacerTests
         fs.AddFile("source.mp4", 1000);
         fs.AddFile("candidate.mp4", 500);
         // Simulate the staged file landing at an unexpected size: the guard must refuse to delete.
-        fs.StagedLengthOverride["source.videotriage.staging.42.mp4"] = 499;
+        fs.StagedLengthOverride[$"source.videotriage.staging.{TestTxN}.mp4"] = 499;
         var remover = new FakeFileRemover(fs);
 
         var result = Build(fs, remover).Replace("source.mp4", "candidate.mp4", DeleteMode.RecycleBin);
@@ -59,9 +63,9 @@ public sealed class SafeReplacerTests
         result.FinalPath.ShouldBe("source.mp4");
         fs.Operations.ShouldBe(new[]
         {
-            "move:candidate.mp4->source.videotriage.staging.42.mp4",
+            $"move:candidate.mp4->source.videotriage.staging.{TestTxN}.mp4",
             "remove:source.mp4:RecycleBin",
-            "move:source.videotriage.staging.42.mp4->source.mp4"
+            $"move:source.videotriage.staging.{TestTxN}.mp4->source.mp4"
         });
     }
 
@@ -78,14 +82,14 @@ public sealed class SafeReplacerTests
 
         result.Outcome.ShouldBe(ReplaceOutcome.ReplacePartial);
         result.OriginalRemoved.ShouldBeTrue();
-        result.FinalPath.ShouldBe("source.videotriage.partial.42.mp4");
+        result.FinalPath.ShouldBe($"source.videotriage.partial.{TestTxN}.mp4");
         // Verified bytes were never lost: they live under the partial name.
-        fs.FileExists("source.videotriage.partial.42.mp4").ShouldBeTrue();
+        fs.FileExists($"source.videotriage.partial.{TestTxN}.mp4").ShouldBeTrue();
         fs.Operations.ShouldBe(new[]
         {
-            "move:candidate.mp4->source.videotriage.staging.42.mp4",
+            $"move:candidate.mp4->source.videotriage.staging.{TestTxN}.mp4",
             "remove:source.mp4:RecycleBin",
-            "move:source.videotriage.staging.42.mp4->source.videotriage.partial.42.mp4"
+            $"move:source.videotriage.staging.{TestTxN}.mp4->source.videotriage.partial.{TestTxN}.mp4"
         });
     }
 
@@ -106,13 +110,13 @@ public sealed class SafeReplacerTests
         fs.Operations.ShouldNotContain(op => op.StartsWith("remove:"));
     }
 
-    // REGRESSION (critical): the pipeline encodes to EncodePath(source, pid) and passes that exact
+    // REGRESSION (critical): the pipeline encodes to EncodePath(source, txId) and passes that exact
     // path as the candidate. Staging must NOT reuse EncodePath, or the move becomes x -> x and throws.
     [Fact]
-    public void Replace_CandidateIsEncodeTempForSameSourceAndPid_SucceedsWithoutSelfCollision()
+    public void Replace_CandidateIsEncodeTempForSameSourceAndTxId_SucceedsWithoutSelfCollision()
     {
         var fs = new FakeFileSystem();
-        var encodeTemp = TempFileNaming.EncodePath("source.mp4", 42); // "source.videotriage.tmp.42.mp4"
+        var encodeTemp = TempFileNaming.EncodePath("source.mp4", TestTxId);
         fs.AddFile("source.mp4", 1000);
         fs.AddFile(encodeTemp, 500);
         var remover = new FakeFileRemover(fs);
@@ -123,9 +127,9 @@ public sealed class SafeReplacerTests
         result.OriginalRemoved.ShouldBeTrue();
         fs.Operations.ShouldBe(new[]
         {
-            "move:source.videotriage.tmp.42.mp4->source.videotriage.staging.42.mp4",
+            $"move:source.videotriage.tmp.{TestTxN}.mp4->source.videotriage.staging.{TestTxN}.mp4",
             "remove:source.mp4:RecycleBin",
-            "move:source.videotriage.staging.42.mp4->source.mp4"
+            $"move:source.videotriage.staging.{TestTxN}.mp4->source.mp4"
         });
         // The encode temp must be consumed (moved into staging), never left behind.
         fs.FileExists(encodeTemp).ShouldBeFalse();

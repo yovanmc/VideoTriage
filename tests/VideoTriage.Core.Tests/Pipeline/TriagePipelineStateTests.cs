@@ -136,7 +136,7 @@ public sealed class TriagePipelineStateTests
 
         fakes.CompletedAppends.ShouldBeEmpty();
         fakes.ManifestAppends.ShouldBeEmpty();
-        fakes.ResultAppends.Single().Outcome.ShouldBe(TriageOutcome.EncodeFailed);
+        fakes.ResultAppends.Single().Outcome.ShouldBe(TriageOutcome.ReplaceFailed);
     }
 
     [Fact]
@@ -151,6 +151,80 @@ public sealed class TriagePipelineStateTests
         fakes.ResultAppends.ShouldBeEmpty();
         fakes.CreatedDirectories.ShouldBeEmpty();
         fakes.StoreFactoryCalls.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task RunAsync_NonDryRun_AcquiresRunLease()
+    {
+        var fakes = PipelineStateFakes.WithSuccessfulReplacement();
+
+        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+
+        fakes.LeaseAcquireCalls.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task RunAsync_DryRun_DoesNotAcquireRunLease()
+    {
+        var fakes = PipelineStateFakes.WithSuccessfulReplacement();
+
+        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions { DryRun = true });
+
+        fakes.LeaseAcquireCalls.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task RunAsync_RecoveryUnrecoverable_ThrowsBeforeProbe()
+    {
+        var fakes = PipelineStateFakes.WithSuccessfulReplacement();
+        fakes.RecoveryUnrecoverableCount = 1;
+
+        var ex = await Should.ThrowAsync<ReplacementRecoveryRequiredException>(
+            () => fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions()));
+
+        ex.Entries.Count.ShouldBe(1);
+        fakes.ProbeCalls.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task RunAsync_RecoveryOnlyRecovered_RunProceedsNormally()
+    {
+        var fakes = PipelineStateFakes.WithSuccessfulReplacement();
+        fakes.RecoveryUnrecoverableCount = 0; // no unrecoverable entries
+
+        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+
+        fakes.ProbeCalls.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task RunAsync_DryRun_RecoveryNotInvoked()
+    {
+        var fakes = PipelineStateFakes.WithSuccessfulReplacement();
+        fakes.RecoveryUnrecoverableCount = 1; // would fail if invoked
+
+        // DryRun must skip recovery entirely — no exception should be thrown
+        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions { DryRun = true });
+
+        fakes.RecoveryCalls.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task RunAsync_NonDryRun_SavesActiveRunBeforeEachFileAndClearsAfter()
+    {
+        var fakes = PipelineStateFakes.WithSuccessfulReplacement();
+        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        fakes.ActiveRunSaves.ShouldNotBeEmpty();
+        fakes.ActiveRunSaves.Last().CurrentFile.ShouldBe(PipelineStateFakes.FilePath);
+        fakes.ActiveRunClears.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task RunAsync_DryRun_DoesNotSaveActiveRun()
+    {
+        var fakes = PipelineStateFakes.WithSuccessfulReplacement();
+        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions { DryRun = true });
+        fakes.ActiveRunSaves.ShouldBeEmpty();
     }
 
     private sealed class PipelineStateFakes
@@ -169,19 +243,27 @@ public sealed class TriagePipelineStateTests
         public int ProbeCalls { get; private set; }
         public int CompletedLoadCalls { get; private set; }
         public int StoreFactoryCalls { get; private set; }
+        public int LeaseAcquireCalls => _leaseFactory.AcquireCalls;
+        public int RecoveryCalls { get; private set; }
+        public int RecoveryUnrecoverableCount { get; set; } = 0;
 
         public List<CompletedFileEntry> CompletedAppends { get; } = [];
         public List<DeleteManifestEntry> ManifestAppends { get; } = [];
         public List<ResultLogEntry> ResultAppends { get; } = [];
         public List<string> CreatedDirectories { get; } = [];
         public List<string> StoreFactoryPaths { get; } = [];
+        public List<ActiveRunState> ActiveRunSaves { get; } = [];
+        public int ActiveRunClears { get; private set; }
+        internal void RecordActiveRunClear() => ActiveRunClears++;
 
         private readonly List<CompletedFileEntry> _preloaded = [];
+        private readonly FakeRunLeaseFactory _leaseFactory = new();
         public TriagePipeline Pipeline { get; }
 
         private PipelineStateFakes()
         {
             Pipeline = new TriagePipeline(
+                _leaseFactory,
                 new FakeDiscovery(),
                 new FakeProbe(this),
                 new FakeClassifier(this),
@@ -206,7 +288,13 @@ public sealed class TriagePipelineStateTests
                     StoreFactoryCalls++;
                     StoreFactoryPaths.Add(path);
                     return new FakeResultLog(this);
-                });
+                },
+                recoveryFactory: path =>
+                {
+                    RecoveryCalls++;
+                    return new FakeRecovery(this);
+                },
+                activeRunJournalFactory: _ => new FakeActiveRunJournal(this));
         }
 
         public static PipelineStateFakes WithSuccessfulReplacement() => new();
@@ -328,6 +416,44 @@ public sealed class TriagePipelineStateTests
         private sealed class FakeResultLog(PipelineStateFakes f) : IResultLog
         {
             public void Append(ResultLogEntry entry) => f.ResultAppends.Add(entry);
+        }
+
+        internal sealed class FakeRunLeaseFactory : IRunLeaseFactory
+        {
+            public int AcquireCalls { get; private set; }
+            public IDisposable Acquire(string dataDirectory)
+            {
+                AcquireCalls++;
+                return new FakeLease();
+            }
+            private sealed class FakeLease : IDisposable { public void Dispose() { } }
+        }
+
+        private sealed class FakeRecovery(PipelineStateFakes f) : VideoTriage.Core.State.IReplacementRecovery
+        {
+            public VideoTriage.Core.State.ReplacementRecoveryReport Recover()
+            {
+                var unrecoverable = Enumerable.Range(0, f.RecoveryUnrecoverableCount)
+                    .Select(i => new VideoTriage.Core.State.UnrecoverableEntry
+                    {
+                        OriginalPath = $@"C:\videos\broken{i}.mov",
+                        Detail = "Both files missing."
+                    })
+                    .ToList();
+                return new VideoTriage.Core.State.ReplacementRecoveryReport
+                {
+                    Recovered = [],
+                    Cleaned = [],
+                    Unrecoverable = unrecoverable
+                };
+            }
+        }
+
+        private sealed class FakeActiveRunJournal(PipelineStateFakes f) : VideoTriage.Core.State.IActiveRunJournal
+        {
+            public void Save(VideoTriage.Core.State.ActiveRunState state) => f.ActiveRunSaves.Add(state);
+            public void Clear() => f.RecordActiveRunClear();
+            public VideoTriage.Core.State.ActiveRunState? Load() => null;
         }
     }
 }

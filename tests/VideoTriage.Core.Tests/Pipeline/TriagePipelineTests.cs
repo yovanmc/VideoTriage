@@ -174,9 +174,46 @@ public sealed class TriagePipelineTests
         fakes.Calls.ShouldContain("delete-temp"); // encode temp cleaned up
     }
 
+    [Fact]
+    public async Task RunAsync_EncoderThrowsDiskFull_RecordsFailureAndContinues()
+    {
+        // Two files: encoder throws IOException on the first, succeeds on the second.
+        var fakes = PipelineFakes.TwoFiles();
+        fakes.ThrowOnFirstEncode = new IOException("No space left on device");
+
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+
+        // First file recorded as EncodeFailed, second file was processed and replaced.
+        result.Failed.ShouldBe(1);
+        result.Replaced.ShouldBe(1);
+        var failedFile = result.Files.Single(f => f.Outcome == TriageOutcome.EncodeFailed);
+        failedFile.FilePath.ShouldBe(PipelineFakes.FilePath);
+        var replacedFile = result.Files.Single(f => f.Outcome == TriageOutcome.Replaced);
+        replacedFile.FilePath.ShouldBe(PipelineFakes.SecondFilePath);
+    }
+
+    [Fact]
+    public async Task RunAsync_CoordinatorReturnsReplaceFailed_RecordsOutcomeAndContinues()
+    {
+        // Two files: replacer returns Failed for the first, succeeds for the second.
+        var fakes = PipelineFakes.TwoFiles();
+        fakes.FailFirstReplace = true;
+
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+
+        // First file recorded as ReplaceFailed, second file was processed and replaced.
+        result.Failed.ShouldBe(1);
+        result.Replaced.ShouldBe(1);
+        var failedFile = result.Files.Single(f => f.Outcome == TriageOutcome.ReplaceFailed);
+        failedFile.FilePath.ShouldBe(PipelineFakes.FilePath);
+        var replacedFile = result.Files.Single(f => f.Outcome == TriageOutcome.Replaced);
+        replacedFile.FilePath.ShouldBe(PipelineFakes.SecondFilePath);
+    }
+
     private sealed class PipelineFakes
     {
         internal const string FilePath = @"C:\Videos\clip.mov";
+        internal const string SecondFilePath = @"C:\Videos\clip2.mov";
 
         public List<string> Calls { get; } = [];
         public HashSet<string> CreatedFiles { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -192,11 +229,21 @@ public sealed class TriagePipelineTests
         public Action? OnEncode { get; set; }
         public bool OriginalRemoved { get; private set; }
 
+        // Multi-file support
+        public bool TwoFileMode { get; set; }
+        /// <summary>If set, the encoder throws this exception on the first encode call.</summary>
+        public IOException? ThrowOnFirstEncode { get; set; }
+        /// <summary>If true, the replacer returns Failed for the first file only.</summary>
+        public bool FailFirstReplace { get; set; }
+        private int _encodeCalls;
+        private int _replaceCalls;
+
         public TriagePipeline Pipeline { get; }
 
         private PipelineFakes()
         {
             Pipeline = new TriagePipeline(
+                new FakeRunLeaseFactory(),
                 new FakeDiscovery(this),
                 new FakeProbe(this),
                 new FakeClassifier(this),
@@ -211,8 +258,11 @@ public sealed class TriagePipelineTests
 
         public static PipelineFakes Candidate() => new();
         public static PipelineFakes LowBpp() => new() { Classification = ClassificationOutcome.SkipLowBpp };
+        public static PipelineFakes TwoFiles() => new() { TwoFileMode = true };
 
         internal void MarkOriginalRemoved() => OriginalRemoved = true;
+        internal int IncrementEncodeCalls() => ++_encodeCalls;
+        internal int IncrementReplaceCalls() => ++_replaceCalls;
 
         internal VideoStats Stats() => new()
         {
@@ -231,7 +281,7 @@ public sealed class TriagePipelineTests
             public IReadOnlyList<string> FindVideos(string folderPath, TriageOptions? options = null, bool recursive = false)
             {
                 f.Calls.Add("discover");
-                return [FilePath];
+                return f.TwoFileMode ? [FilePath, SecondFilePath] : [FilePath];
             }
         }
 
@@ -261,11 +311,15 @@ public sealed class TriagePipelineTests
                 IProgress<double>? progress = null, CancellationToken cancellationToken = default)
             {
                 f.Calls.Add("encode");
+                var callNumber = f.IncrementEncodeCalls();
                 // Register the output file before invoking callbacks/cancellation checks so
                 // that the catch/finally cleanup can correctly detect it via FileExists.
                 f.CreatedFiles.Add(outputPath);
                 f.OnEncode?.Invoke();
                 cancellationToken.ThrowIfCancellationRequested();
+                // Throw IOException on first encode if requested (simulates disk-full mid-encode).
+                if (callNumber == 1 && f.ThrowOnFirstEncode is not null)
+                    throw f.ThrowOnFirstEncode;
                 if (f.EncodeOutcome != EncodeOutcome.Succeeded)
                     f.CreatedFiles.Remove(outputPath);
                 return Task.FromResult(new EncodeResult
@@ -292,7 +346,10 @@ public sealed class TriagePipelineTests
             public ReplaceResult Replace(string originalPath, string verifiedReplacementPath, DeleteMode deleteMode)
             {
                 f.Calls.Add("replace");
-                if (f.ReplaceOutcome is not ReplaceOutcome.Failed)
+                var callNumber = f.IncrementReplaceCalls();
+                // If FailFirstReplace is set, return Failed outcome for the first call only.
+                var outcome = (f.FailFirstReplace && callNumber == 1) ? ReplaceOutcome.Failed : f.ReplaceOutcome;
+                if (outcome is not ReplaceOutcome.Failed)
                 {
                     f.MarkOriginalRemoved();
                     // Model that SafeReplacer consumed (moved) the replacement file.
@@ -300,12 +357,12 @@ public sealed class TriagePipelineTests
                 }
                 return new ReplaceResult
                 {
-                    Outcome = f.ReplaceOutcome,
-                    FinalPath = f.ReplaceOutcome == ReplaceOutcome.ReplacePartial
-                        ? TempFileNaming.PartialPath(originalPath, 1)
+                    Outcome = outcome,
+                    FinalPath = outcome == ReplaceOutcome.ReplacePartial
+                        ? TempFileNaming.PartialPath(originalPath, Guid.Empty)
                         : Path.ChangeExtension(originalPath, ".mp4"),
-                    Reason = "replaced",
-                    OriginalRemoved = f.ReplaceOutcome is not ReplaceOutcome.Failed
+                    Reason = outcome == ReplaceOutcome.Failed ? "replace failed" : "replaced",
+                    OriginalRemoved = outcome is not ReplaceOutcome.Failed
                 };
             }
         }
@@ -346,6 +403,12 @@ public sealed class TriagePipelineTests
         private sealed class NoOpResultLog : IResultLog
         {
             public void Append(ResultLogEntry entry) { }
+        }
+
+        private sealed class FakeRunLeaseFactory : IRunLeaseFactory
+        {
+            public IDisposable Acquire(string dataDirectory) => new FakeLease();
+            private sealed class FakeLease : IDisposable { public void Dispose() { } }
         }
     }
 }

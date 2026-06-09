@@ -63,6 +63,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<DiagnosticsViewModel>();
         services.AddSingleton<IProcessRunner, ProcessRunner>();
+        services.AddSingleton<IRunLeaseFactory, FileRunLeaseFactory>();
         services.AddSingleton<IFileSystem, PhysicalFileSystem>();
         services.AddSingleton<IVideoFileDiscovery, VideoFileDiscovery>();
         services.AddSingleton<IVideoClassifier, BppClassifier>();
@@ -75,6 +76,19 @@ public static class ServiceCollectionExtensions
             _ => dir => new CsvDeleteManifest(Path.Combine(dir, "deletions.csv")));
         services.AddSingleton<Func<string, IResultLog>>(
             _ => dir => new JsonLinesResultLog(Path.Combine(dir, "results.jsonl")));
+        services.AddSingleton<Func<string, IReplacementTransactionCoordinator>>(sp =>
+            dir => new ReplacementTransactionCoordinator(
+                new JsonLinesReplacementJournal(Path.Combine(dir, "replacement-journal.jsonl")),
+                sp.GetRequiredService<IFileSystem>(),
+                sp.GetRequiredService<IFileRemover>(),
+                new CsvDeleteManifest(Path.Combine(dir, "deletions.csv"))));
+        services.AddSingleton<Func<string, IReplacementRecovery>>(sp =>
+            dir => new ReplacementRecovery(
+                new JsonLinesReplacementJournal(Path.Combine(dir, "replacement-journal.jsonl")),
+                sp.GetRequiredService<IFileSystem>(),
+                new CsvDeleteManifest(Path.Combine(dir, "deletions.csv"))));
+        services.AddSingleton<Func<string, IActiveRunJournal>>(
+            _ => dir => new JsonActiveRunJournal(dir));
         services.AddSingleton<ITriagePipelineProvider>(sp =>
         {
             var statuses = sp.GetRequiredService<IPrerequisiteService>().Check();
@@ -95,6 +109,7 @@ public static class ServiceCollectionExtensions
                 Path.Combine(AppContext.BaseDirectory, "Encoding", "Assets", "videotriage-av1.json"),
                 "VideoTriage AV1");
             ITriagePipeline pipeline = new TriagePipeline(
+                sp.GetRequiredService<IRunLeaseFactory>(),
                 sp.GetRequiredService<IVideoFileDiscovery>(),
                 ffprobe,
                 sp.GetRequiredService<IVideoClassifier>(),
@@ -105,7 +120,10 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<Func<string, ICompletedFileStore>>(),
                 sp.GetRequiredService<Func<string, IDeleteManifest>>(),
                 sp.GetRequiredService<Func<string, IResultLog>>(),
-                posterEmbedder);
+                posterEmbedder,
+                sp.GetRequiredService<Func<string, IReplacementTransactionCoordinator>>(),
+                sp.GetRequiredService<Func<string, IReplacementRecovery>>(),
+                sp.GetRequiredService<Func<string, IActiveRunJournal>>());
             return new TriagePipelineProvider(pipeline);
         });
         services.AddSingleton(sp =>
@@ -136,7 +154,8 @@ public static class ServiceCollectionExtensions
                 settings: settings,
                 appLog: sp.GetRequiredService<IAppLog>(),
                 userErrors: sp.GetRequiredService<IUserErrorSink>(),
-                diagnostics: sp.GetRequiredService<DiagnosticsViewModel>());
+                diagnostics: sp.GetRequiredService<DiagnosticsViewModel>(),
+                activeRunJournalFactory: sp.GetRequiredService<Func<string, IActiveRunJournal>>());
         });
         services.AddSingleton<MainWindow>();
 
