@@ -10,7 +10,7 @@ using VideoTriage.Core.Verify;
 namespace VideoTriage.Core.Pipeline;
 
 /// <summary>
-/// Orchestrates discovery → probe → classify → space → encode → verify → size-check → safe-replace,
+/// Orchestrates discovery → probe → classify → space → encode → verify → size-check → replace,
 /// emitting immutable <see cref="FileProgress"/> events. Every destructive step is gated by
 /// verification and a strict size comparison, and every discovered file receives a terminal event.
 /// The original is never touched on any failure path.
@@ -27,7 +27,8 @@ public sealed class TriagePipeline(
     Func<string, ICompletedFileStore> completedStoreFactory,
     Func<string, IDeleteManifest> deleteManifestFactory,
     Func<string, IResultLog> resultLogFactory,
-    IPosterEmbedder? posterEmbedder = null) : ITriagePipeline
+    IPosterEmbedder? posterEmbedder = null,
+    Func<string, IReplacementTransactionCoordinator>? coordinatorFactory = null) : ITriagePipeline
 {
     public async Task<TriageSummary> RunAsync(
         string folder,
@@ -45,6 +46,8 @@ public sealed class TriagePipeline(
         ICompletedFileStore? completedStore = null;
         IDeleteManifest? deleteManifest = null;
         IResultLog? resultLog = null;
+        IReplacementTransactionCoordinator? coordinator = null;
+        Guid runId = Guid.Empty;
         var completedByPath = new Dictionary<string, CompletedFileEntry>(StringComparer.OrdinalIgnoreCase);
 
         if (!options.DryRun)
@@ -53,6 +56,12 @@ public sealed class TriagePipeline(
             completedStore = completedStoreFactory(dataDirectory);
             deleteManifest = deleteManifestFactory(dataDirectory);
             resultLog = resultLogFactory(dataDirectory);
+
+            if (coordinatorFactory is not null)
+            {
+                coordinator = coordinatorFactory(dataDirectory);
+                runId = Guid.NewGuid();
+            }
 
             foreach (var entry in completedStore.Load())
             {
@@ -123,7 +132,10 @@ public sealed class TriagePipeline(
                 });
             }
 
-            if (replace is { OriginalRemoved: true } &&
+            // Only append to pipeline-level manifest when NOT using the transaction coordinator
+            // (which appends to its own manifest internally).
+            if (coordinator is null &&
+                replace is { OriginalRemoved: true } &&
                 source is not null &&
                 finalPath is not null &&
                 outputBytes.HasValue &&
@@ -276,12 +288,30 @@ public sealed class TriagePipeline(
                 }
 
                 Report(path, TriagePhase.Replacing);
-                var replace = replacer.Replace(path, replacementPath, options.DeleteMode);
+                ReplaceResult replace;
+                if (coordinator is not null)
+                {
+                    replace = coordinator.Replace(new ReplacementTransactionRequest
+                    {
+                        RunId = runId,
+                        OriginalPath = path,
+                        VerifiedReplacementPath = replacementPath,
+                        OriginalBytes = probe.Stats.FileSizeBytes,
+                        ReplacementBytes = outputBytes,
+                        DeleteMode = options.DeleteMode
+                    });
+                }
+                else
+                {
+                    replace = replacer.Replace(path, replacementPath, options.DeleteMode);
+                }
+
                 if (!replace.Succeeded)
                 {
-                    if (fileSystem.FileExists(replacementPath))
+                    if (coordinator is null && fileSystem.FileExists(replacementPath))
                         fileSystem.DeleteFile(replacementPath);
-                    if (!string.Equals(replacementPath, encodePath, StringComparison.OrdinalIgnoreCase) &&
+                    if (coordinator is null &&
+                        !string.Equals(replacementPath, encodePath, StringComparison.OrdinalIgnoreCase) &&
                         fileSystem.FileExists(encodePath))
                     {
                         fileSystem.DeleteFile(encodePath);
@@ -295,7 +325,7 @@ public sealed class TriagePipeline(
                     continue;
                 }
 
-                // SafeReplacer consumed replacementPath into staging/final.
+                // Coordinator consumed replacementPath into staging/final.
                 var savedPercent =
                     (probe.Stats.FileSizeBytes - outputBytes) / (double)probe.Stats.FileSizeBytes * 100;
                 Complete(
