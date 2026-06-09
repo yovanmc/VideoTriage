@@ -292,8 +292,13 @@
                 BorderBrush="#22000000"
                 BorderThickness="0,1,0,0">
             <Grid>
-                <TextBlock VerticalAlignment="Center"
-                           Text="{Binding Items.Count, StringFormat=Queue: {0} files}" />
+                <Border VerticalAlignment="Center"
+                        BorderBrush="#735CC8FF"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="8,2">
+                    <TextBlock Text="{Binding Items.Count, StringFormat=Queue: {0} files}" />
+                </Border>
                 <TextBlock HorizontalAlignment="Right"
                            VerticalAlignment="Center"
                            Text="{Binding StatusMessage}" />
