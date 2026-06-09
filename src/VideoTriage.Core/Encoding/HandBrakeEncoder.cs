@@ -41,7 +41,8 @@ public sealed class HandBrakeEncoder(
                         "--json"
                     ],
                     Timeout = Timeout.InfiniteTimeSpan,
-                    StandardOutputLines = outputLines
+                    StandardOutputLines = outputLines,
+                    StandardErrorLines = outputLines   // HandBrake may route --json progress to stderr
                 },
                 cancellationToken);
 
