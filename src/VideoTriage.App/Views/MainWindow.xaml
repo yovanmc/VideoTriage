@@ -119,17 +119,7 @@
                                    Content="Start"
                                    Appearance="Primary"
                                    Width="92"
-                                   Command="{Binding StartCommand}">
-                            <ui:Button.Style>
-                                <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
-                                    <Style.Triggers>
-                                        <Trigger Property="IsEnabled" Value="False">
-                                            <Setter Property="Opacity" Value="0.4" />
-                                        </Trigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </ui:Button.Style>
-                        </ui:Button>
+                                   Command="{Binding StartCommand}" />
                         <Button x:Name="PauseButton"
                                 Content="Pause"
                                 Width="92"
