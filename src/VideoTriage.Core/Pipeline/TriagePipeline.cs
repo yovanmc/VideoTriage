@@ -322,6 +322,14 @@ public sealed class TriagePipeline(
                     sourceLastWrite: sourceLastWrite);
                 throw;
             }
+            finally
+            {
+                // Defensive: clean up encodePath on any unexpected exception. Normal paths (success,
+                // cancellation, handled failures) have already consumed or deleted the file before
+                // reaching here, so FileExists returns false and this is a no-op for them.
+                if (fileSystem.FileExists(encodePath))
+                    try { fileSystem.DeleteFile(encodePath); } catch { }
+            }
         }
 
         return Summarize(results, options);
