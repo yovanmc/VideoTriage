@@ -39,9 +39,9 @@
                     Padding="16"
                     BorderBrush="#22000000"
                     BorderThickness="0,0,1,0">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Hidden">
                 <StackPanel>
-                    <TextBlock Text="Source folder" FontWeight="SemiBold" />
+                    <TextBlock Text="Source folder" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
                     <TextBlock Margin="0,6,0,10"
                                Text="{Binding SelectedFolder}"
                                TextWrapping="Wrap"
@@ -51,7 +51,8 @@
 
                     <TextBlock Margin="0,24,0,8"
                                Text="Preset"
-                               FontWeight="SemiBold" />
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource AccentBrush}" />
                     <TextBlock Text="VideoTriage AV1" />
                     <TextBlock Text="Read-only scan before encoding"
                                Opacity="0.7"
@@ -59,7 +60,8 @@
 
                     <TextBlock Margin="0,24,0,8"
                                Text="Prerequisites"
-                               FontWeight="SemiBold" />
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource AccentBrush}" />
                     <ItemsControl ItemsSource="{Binding Prerequisites}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
