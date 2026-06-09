@@ -11,7 +11,7 @@
 
         <TextBlock Margin="0,8,0,2"
                    Text="{Binding ErrorCount, StringFormat=Messages: {0}}" />
-        <TextBox Text="{Binding LogPath}"
+        <TextBox Text="{Binding LogPath, Mode=OneWay}"
                  IsReadOnly="True"
                  TextWrapping="Wrap"
                  BorderThickness="0"
