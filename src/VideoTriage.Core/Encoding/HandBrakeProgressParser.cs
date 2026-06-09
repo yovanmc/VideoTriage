@@ -6,12 +6,16 @@ public static class HandBrakeProgressParser
 {
     public static double? TryParseProgress(string line)
     {
-        if (string.IsNullOrWhiteSpace(line) || line[0] != '{')
+        if (string.IsNullOrWhiteSpace(line))
+            return null;
+
+        var jsonStart = line.IndexOf('{');
+        if (jsonStart < 0)
             return null;
 
         try
         {
-            using var document = JsonDocument.Parse(line);
+            using var document = JsonDocument.Parse(line.Substring(jsonStart));
             if (!document.RootElement.TryGetProperty("Working", out var working) ||
                 !working.TryGetProperty("Progress", out var progress) ||
                 !progress.TryGetDouble(out var value))

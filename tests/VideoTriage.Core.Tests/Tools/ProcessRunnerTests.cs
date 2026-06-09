@@ -34,7 +34,7 @@ public sealed class ProcessRunnerTests
         });
 
         result.Succeeded.ShouldBeTrue();
-        File.ReadAllText(result.StandardErrorPath).ShouldContain("stderr-text");
+        File.ReadAllText(result.StandardErrorPath!).ShouldContain("stderr-text");
     }
 
     [Fact]
@@ -83,6 +83,18 @@ public sealed class ProcessRunnerTests
                 Timeout = TimeSpan.FromSeconds(10),
                 StderrDirectory = temp.Path
             }, cts.Token));
+    }
+
+    [Fact]
+    public async Task RunAsync_NoStderrDirectory_CreatesNoFile()
+    {
+        var result = await new ProcessRunner().RunAsync(new ProcessRequest
+        {
+            FileName = "cmd.exe",
+            Arguments = ["/c", "echo stderr 1>&2"]
+        });
+
+        result.StandardErrorPath.ShouldBeNull();
     }
 
     private sealed class TempDirectory : IDisposable

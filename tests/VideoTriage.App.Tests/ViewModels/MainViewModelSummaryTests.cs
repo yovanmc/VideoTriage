@@ -14,6 +14,7 @@ public sealed class MainViewModelSummaryTests
     {
         var viewModel = CreateViewModel(new CompletingPipeline(Summary()));
         viewModel.SelectedFolder = @"C:\Videos";
+        viewModel.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
 
         await viewModel.StartCommand.ExecuteAsync(null);
 
@@ -27,6 +28,7 @@ public sealed class MainViewModelSummaryTests
     {
         var viewModel = CreateViewModel(new CancellingPipeline());
         viewModel.SelectedFolder = @"C:\Videos";
+        viewModel.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
 
         await viewModel.StartCommand.ExecuteAsync(null);
 
@@ -43,6 +45,7 @@ public sealed class MainViewModelSummaryTests
             dialog,
             () => new TriageOptions { DataDirectoryName = ".triage-state" });
         viewModel.SelectedFolder = @"C:\Videos";
+        viewModel.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
 
         await viewModel.StartCommand.ExecuteAsync(null);
         viewModel.OpenDataDirectoryCommand.Execute(null);
@@ -55,6 +58,7 @@ public sealed class MainViewModelSummaryTests
     {
         var viewModel = CreateViewModel(new CompletingPipeline(Summary()));
         viewModel.SelectedFolder = @"C:\Videos";
+        viewModel.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
         await viewModel.StartCommand.ExecuteAsync(null);
 
         viewModel.BackToQueueCommand.Execute(null);
@@ -69,6 +73,7 @@ public sealed class MainViewModelSummaryTests
             new CompletingPipeline(Summary()),
             optionsFactory: () => new TriageOptions { DryRun = true });
         viewModel.SelectedFolder = @"C:\Videos";
+        viewModel.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
 
         await viewModel.StartCommand.ExecuteAsync(null);
 

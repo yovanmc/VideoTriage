@@ -10,13 +10,16 @@ public sealed class ProcessRunner : IProcessRunner
         ArgumentNullException.ThrowIfNull(request);
 
         if (string.IsNullOrWhiteSpace(request.FileName))
-        {
             throw new ArgumentException("Process file name is required.", nameof(request));
-        }
 
-        var stderrDirectory = request.StderrDirectory ?? Path.GetTempPath();
-        Directory.CreateDirectory(stderrDirectory);
-        var stderrPath = Path.Combine(stderrDirectory, $"videotriage-stderr-{Guid.NewGuid():N}.log");
+        string? stderrPath = null;
+        if (request.StderrDirectory is not null)
+        {
+            Directory.CreateDirectory(request.StderrDirectory);
+            stderrPath = Path.Combine(
+                request.StderrDirectory,
+                $"videotriage-stderr-{Guid.NewGuid():N}.log");
+        }
 
         using var process = new Process
         {
@@ -27,7 +30,7 @@ public sealed class ProcessRunner : IProcessRunner
         process.Start();
 
         var stdoutTask = ReadStandardOutputAsync(process, request.StandardOutputLines);
-        var stderrTask = CopyStandardErrorAsync(process, stderrPath);
+        var stderrTask = HandleStandardErrorAsync(process, stderrPath, request.StandardErrorLines);
 
         var timedOut = false;
         using var timeoutCts = new CancellationTokenSource(request.Timeout);
@@ -79,25 +82,35 @@ public sealed class ProcessRunner : IProcessRunner
         };
 
         if (!string.IsNullOrWhiteSpace(request.WorkingDirectory))
-        {
             startInfo.WorkingDirectory = request.WorkingDirectory;
-        }
 
         foreach (var argument in request.Arguments)
-        {
             startInfo.ArgumentList.Add(argument);
-        }
 
         return startInfo;
     }
 
-    private static async Task CopyStandardErrorAsync(Process process, string stderrPath)
+    private static async Task HandleStandardErrorAsync(
+        Process process,
+        string? stderrPath,
+        IProgress<string>? stderrLines)
     {
-        await using var file = new FileStream(stderrPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
-        await using var writer = new StreamWriter(file);
-        while (await process.StandardError.ReadLineAsync() is { } line)
+        if (stderrPath is not null)
         {
-            await writer.WriteLineAsync(line);
+            await using var file = new FileStream(
+                stderrPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+            await using var writer = new StreamWriter(file);
+            while (await process.StandardError.ReadLineAsync() is { } line)
+            {
+                await writer.WriteLineAsync(line);
+                stderrLines?.Report(line);
+            }
+        }
+        else
+        {
+            // No file requested — drain stderr to prevent process hang on a full buffer.
+            while (await process.StandardError.ReadLineAsync() is { } line)
+                stderrLines?.Report(line);
         }
     }
 
@@ -120,9 +133,7 @@ public sealed class ProcessRunner : IProcessRunner
         try
         {
             if (!process.HasExited)
-            {
                 process.Kill(entireProcessTree: true);
-            }
         }
         catch (InvalidOperationException)
         {

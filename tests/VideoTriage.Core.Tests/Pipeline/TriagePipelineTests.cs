@@ -179,6 +179,7 @@ public sealed class TriagePipelineTests
         internal const string FilePath = @"C:\Videos\clip.mov";
 
         public List<string> Calls { get; } = [];
+        public HashSet<string> CreatedFiles { get; } = new(StringComparer.OrdinalIgnoreCase);
         public long AvailableBytes { get; set; } = long.MaxValue;
         public long SourceBytes { get; set; } = 1000;
         public long OutputBytes { get; set; } = 500;
@@ -260,8 +261,13 @@ public sealed class TriagePipelineTests
                 IProgress<double>? progress = null, CancellationToken cancellationToken = default)
             {
                 f.Calls.Add("encode");
+                // Register the output file before invoking callbacks/cancellation checks so
+                // that the catch/finally cleanup can correctly detect it via FileExists.
+                f.CreatedFiles.Add(outputPath);
                 f.OnEncode?.Invoke();
                 cancellationToken.ThrowIfCancellationRequested();
+                if (f.EncodeOutcome != EncodeOutcome.Succeeded)
+                    f.CreatedFiles.Remove(outputPath);
                 return Task.FromResult(new EncodeResult
                 {
                     Outcome = f.EncodeOutcome,
@@ -287,7 +293,11 @@ public sealed class TriagePipelineTests
             {
                 f.Calls.Add("replace");
                 if (f.ReplaceOutcome is not ReplaceOutcome.Failed)
+                {
                     f.MarkOriginalRemoved();
+                    // Model that SafeReplacer consumed (moved) the replacement file.
+                    f.CreatedFiles.Remove(verifiedReplacementPath);
+                }
                 return new ReplaceResult
                 {
                     Outcome = f.ReplaceOutcome,
@@ -302,12 +312,18 @@ public sealed class TriagePipelineTests
 
         private sealed class FakeFileSystem(PipelineFakes f) : IFileSystem
         {
-            public bool FileExists(string path) => true;
+            private readonly HashSet<string> _deleted = new(StringComparer.OrdinalIgnoreCase);
+            public bool FileExists(string path) =>
+                f.CreatedFiles.Contains(path) && !_deleted.Contains(path);
             public long GetFileLength(string path) => f.OutputBytes;
             public void CreateDirectory(string path) { }
             public void CopyFile(string sourcePath, string destinationPath, bool overwrite) { }
             public void MoveFile(string sourcePath, string destinationPath) { }
-            public void DeleteFile(string path) => f.Calls.Add("delete-temp");
+            public void DeleteFile(string path)
+            {
+                _deleted.Add(path);
+                f.Calls.Add("delete-temp");
+            }
             public long GetAvailableFreeSpace(string path)
             {
                 f.Calls.Add("space");

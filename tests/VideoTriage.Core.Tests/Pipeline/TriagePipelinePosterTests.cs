@@ -81,6 +81,7 @@ public sealed class TriagePipelinePosterTests
         private const string FilePath = @"C:\Videos\clip.mov";
         private readonly Dictionary<string, long> _lengths = new(StringComparer.OrdinalIgnoreCase);
         private readonly string? _embedderReturns;
+        internal readonly HashSet<string> _created = new(StringComparer.OrdinalIgnoreCase);
 
         public List<string> Calls { get; } = [];
         public long SourceBytes { get; } = 1000;
@@ -160,6 +161,7 @@ public sealed class TriagePipelinePosterTests
                 CancellationToken cancellationToken = default)
             {
                 f.EncodePath = outputPath;
+                f._created.Add(outputPath);
                 f.Calls.Add("encode");
                 return Task.FromResult(new EncodeResult
                 {
@@ -196,9 +198,12 @@ public sealed class TriagePipelinePosterTests
                 CancellationToken cancellationToken = default)
             {
                 f.Calls.Add("embed-poster");
+                var outputPath = f._embedderReturns ?? verifiedEncodePath;
+                if (f._embedderReturns is not null)
+                    f._created.Add(f._embedderReturns);
                 return Task.FromResult(new PosterEmbedResult
                 {
-                    OutputPath = f._embedderReturns ?? verifiedEncodePath,
+                    OutputPath = outputPath,
                     Embedded = f._embedderReturns is not null,
                     Reason = "poster"
                 });
@@ -211,6 +216,11 @@ public sealed class TriagePipelinePosterTests
             {
                 f.Calls.Add($"replace:{verifiedReplacementPath}");
                 f.OriginalRemoved = f.ReplaceOutcome == ReplaceOutcome.Replaced;
+                if (f.OriginalRemoved)
+                {
+                    // Model that SafeReplacer consumed (moved) the replacement file.
+                    f._created.Remove(verifiedReplacementPath);
+                }
                 return new ReplaceResult
                 {
                     Outcome = f.ReplaceOutcome,
@@ -223,12 +233,18 @@ public sealed class TriagePipelinePosterTests
 
         private sealed class FakeFileSystem(PipelinePosterFakes f) : IFileSystem
         {
-            public bool FileExists(string path) => true;
+            private readonly HashSet<string> _deleted = new(StringComparer.OrdinalIgnoreCase);
+            public bool FileExists(string path) =>
+                f._created.Contains(path) && !_deleted.Contains(path);
             public long GetFileLength(string path) => f.Length(path);
             public void CreateDirectory(string path) { }
             public void CopyFile(string sourcePath, string destinationPath, bool overwrite) { }
             public void MoveFile(string sourcePath, string destinationPath) { }
-            public void DeleteFile(string path) => f.Calls.Add($"delete:{path}");
+            public void DeleteFile(string path)
+            {
+                _deleted.Add(path);
+                f.Calls.Add($"delete:{path}");
+            }
             public long GetAvailableFreeSpace(string path) => long.MaxValue;
             public DateTimeOffset GetLastWriteTimeUtc(string path) => DateTimeOffset.UnixEpoch;
         }

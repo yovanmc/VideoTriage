@@ -59,7 +59,17 @@
                   ItemsSource="{Binding Files}"
                   AutoGenerateColumns="False"
                   IsReadOnly="True"
-                  CanUserAddRows="False">
+                  CanUserAddRows="False"
+                  AlternationCount="2">
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                    <Style.Triggers>
+                        <Trigger Property="AlternationIndex" Value="1">
+                            <Setter Property="Background" Value="#0A7F7F7F" />
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
             <DataGrid.Columns>
                 <DataGridTextColumn Header="File"
                                     Binding="{Binding FilePath}"

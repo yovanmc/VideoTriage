@@ -68,6 +68,7 @@ public sealed class ServiceCollectionExtensionsTests
 
         viewModel.ChooseFolderCommand.CanExecute(null).ShouldBeTrue();
         viewModel.SelectedFolder = @"C:\Videos";
+        viewModel.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
         viewModel.StartCommand.CanExecute(null).ShouldBeTrue();
     }
 
