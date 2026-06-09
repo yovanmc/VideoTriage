@@ -73,6 +73,33 @@ public sealed class MainViewModelScanTests
         vm.Prerequisites.Any(x => !x.IsAvailable).ShouldBeTrue();
     }
 
+    [Fact]
+    public async Task ChooseFolderAsync_NonCandidateResult_ExcludedFromItems()
+    {
+        var scanner = new FakeFolderProbeScanner();
+        scanner.Results.Add(Result(@"C:\videos\a.mp4"));                       // Candidate
+        scanner.Results.Add(NonCandidateResult(@"C:\videos\b.mp4"));          // Below threshold
+        var vm = Create(scanner, new FakeDialogService { Result = @"C:\videos" });
+
+        await vm.ChooseFolderAsync();
+
+        vm.Items.Count.ShouldBe(1);
+        vm.Items[0].FileName.ShouldBe("a.mp4");
+    }
+
+    [Fact]
+    public async Task ChooseFolderAsync_SetsQueueRemainingCountAfterScan()
+    {
+        var scanner = new FakeFolderProbeScanner();
+        scanner.Results.Add(Result(@"C:\videos\a.mp4"));
+        scanner.Results.Add(Result(@"C:\videos\b.mp4"));
+        var vm = Create(scanner, new FakeDialogService { Result = @"C:\videos" });
+
+        await vm.ChooseFolderAsync();
+
+        vm.QueueRemainingCount.ShouldBe(2);
+    }
+
     private static MainViewModel Create(
         FakeFolderProbeScanner scanner,
         FakeDialogService dialog,
@@ -105,6 +132,33 @@ public sealed class MainViewModelScanTests
             {
                 Outcome = ClassificationOutcome.Candidate,
                 Reason = "candidate",
+                Stats = stats
+            }
+        };
+    }
+
+    private static ProbeResult NonCandidateResult(string path)
+    {
+        var stats = new VideoStats
+        {
+            FilePath = path,
+            CodecName = "av1",
+            Width = 1920,
+            Height = 1080,
+            FramesPerSecond = 30,
+            Duration = TimeSpan.FromMinutes(1),
+            FileSizeBytes = 5_000_000,
+            VideoBitrateBitsPerSecond = 666_666,
+            HasAudio = true
+        };
+        return new ProbeResult
+        {
+            FilePath = path,
+            Stats = stats,
+            Classification = new ClassificationResult
+            {
+                Outcome = ClassificationOutcome.SkipAlreadyAv1,
+                Reason = "already av1",
                 Stats = stats
             }
         };

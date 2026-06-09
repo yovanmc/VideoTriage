@@ -113,6 +113,89 @@ public sealed class MainViewModelRunTests
         vm.StartCommand.CanExecute(null).ShouldBeTrue();
     }
 
+    [Fact]
+    public async Task ApplyProgress_FirstEncodingEvent_MovesItemToTop()
+    {
+        var pipeline = new FakeTriagePipeline([
+            new FileProgress
+            {
+                FilePath = @"C:\Videos\b.mp4",
+                Phase = TriagePhase.Encoding,
+                EncodeProgress = null
+            }
+        ]);
+        var vm = MakeViewModel(pipeline);
+        vm.SelectedFolder = @"C:\Videos";
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\a.mp4"));
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\b.mp4"));
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\c.mp4"));
+
+        await vm.StartCommand.ExecuteAsync(null);
+
+        vm.Items[0].FileName.ShouldBe("b.mp4");
+    }
+
+    [Fact]
+    public async Task ApplyProgress_DoneEvent_MovesItemToBottom()
+    {
+        var pipeline = new FakeTriagePipeline([
+            new FileProgress
+            {
+                FilePath = @"C:\Videos\a.mp4",
+                Phase = TriagePhase.Done,
+                Outcome = TriageOutcome.Replaced,
+                FinalPath = @"C:\Videos\a.mp4"
+            }
+        ]);
+        var vm = MakeViewModel(pipeline);
+        vm.SelectedFolder = @"C:\Videos";
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\a.mp4"));
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\b.mp4"));
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\c.mp4"));
+
+        await vm.StartCommand.ExecuteAsync(null);
+
+        vm.Items[2].FileName.ShouldBe("a.mp4");
+    }
+
+    [Fact]
+    public async Task ApplyProgress_DoneEvent_DecrementsQueueRemainingCount()
+    {
+        var pipeline = new FakeTriagePipeline([
+            new FileProgress
+            {
+                FilePath = @"C:\Videos\a.mp4",
+                Phase = TriagePhase.Done,
+                Outcome = TriageOutcome.Replaced,
+                FinalPath = @"C:\Videos\a.mp4"
+            }
+        ]);
+        var vm = MakeViewModel(pipeline);
+        vm.SelectedFolder = @"C:\Videos";
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\a.mp4"));
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\b.mp4"));
+
+        await vm.StartCommand.ExecuteAsync(null);
+
+        vm.QueueRemainingCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task StartCommand_SetsQueueRemainingCountToItemsCount()
+    {
+        var pipeline = new FakeTriagePipeline([]);
+        var vm = MakeViewModel(pipeline);
+        vm.SelectedFolder = @"C:\Videos";
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\a.mp4"));
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\b.mp4"));
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\c.mp4"));
+
+        await vm.StartCommand.ExecuteAsync(null);
+
+        // No Done events fired, so count stays at Items.Count (set at start of run)
+        vm.QueueRemainingCount.ShouldBe(3);
+    }
+
     private static MainViewModel MakeViewModel(
         ITriagePipeline? pipeline,
         IUiDispatcher? dispatcher = null,

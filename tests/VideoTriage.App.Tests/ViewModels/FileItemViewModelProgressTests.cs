@@ -72,4 +72,76 @@ public sealed class FileItemViewModelProgressTests
         vm.StatusText.ShouldBe("Saved 68.7%");
         vm.SavedText.ShouldContain(@"C:\Videos\clip.mp4");
     }
+
+    [Fact]
+    public void Apply_Done_SetsProgressTo100()
+    {
+        var vm = new FileItemViewModel(@"C:\Videos\clip.mp4");
+
+        vm.Apply(new FileProgress
+        {
+            FilePath = @"C:\Videos\clip.mp4",
+            Phase = TriagePhase.Done,
+            Outcome = TriageOutcome.Replaced,
+            FinalPath = @"C:\Videos\clip.mp4"
+        });
+
+        vm.Progress.ShouldBe(100);
+    }
+
+    [Fact]
+    public void Apply_EncodingWithoutProgress_IsProgressIndeterminate()
+    {
+        var vm = new FileItemViewModel(@"C:\Videos\clip.mp4");
+
+        vm.Apply(new FileProgress
+        {
+            FilePath = @"C:\Videos\clip.mp4",
+            Phase = TriagePhase.Encoding,
+            EncodeProgress = null
+        });
+
+        vm.IsProgressIndeterminate.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Apply_EncodingWithProgress_IsNotProgressIndeterminate()
+    {
+        var vm = new FileItemViewModel(@"C:\Videos\clip.mp4");
+
+        vm.Apply(new FileProgress
+        {
+            FilePath = @"C:\Videos\clip.mp4",
+            Phase = TriagePhase.Encoding,
+            EncodeProgress = 0.5
+        });
+
+        vm.IsProgressIndeterminate.ShouldBeFalse();
+        vm.Progress.ShouldBe(50);
+    }
+
+    [Fact]
+    public void Apply_Done_ClearsIsProgressIndeterminate()
+    {
+        var vm = new FileItemViewModel(@"C:\Videos\clip.mp4");
+
+        vm.Apply(new FileProgress
+        {
+            FilePath = @"C:\Videos\clip.mp4",
+            Phase = TriagePhase.Encoding,
+            EncodeProgress = null
+        });
+        vm.IsProgressIndeterminate.ShouldBeTrue();
+
+        vm.Apply(new FileProgress
+        {
+            FilePath = @"C:\Videos\clip.mp4",
+            Phase = TriagePhase.Done,
+            Outcome = TriageOutcome.Replaced,
+            FinalPath = @"C:\Videos\clip.mp4"
+        });
+
+        vm.IsProgressIndeterminate.ShouldBeFalse();
+        vm.Progress.ShouldBe(100);
+    }
 }
