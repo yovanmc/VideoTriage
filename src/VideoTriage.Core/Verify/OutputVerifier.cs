@@ -96,7 +96,7 @@ public sealed class OutputVerifier(
                 FileName = ffmpegPath,
                 Arguments = ["-nostdin", "-v", "error", "-i", outputPath, "-f", "null", "-"],
                 StderrDirectory = Path.GetTempPath(),
-                Timeout = TimeSpan.FromMinutes(30)
+                Timeout = TimeSpan.FromMinutes(5)
             },
             cancellationToken);
 
