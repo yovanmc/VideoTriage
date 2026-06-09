@@ -115,10 +115,11 @@
                         BorderBrush="#22000000"
                         BorderThickness="0,0,0,1">
                     <StackPanel Orientation="Horizontal">
-                        <Button x:Name="StartButton"
-                                Content="Start"
-                                Width="92"
-                                Command="{Binding StartCommand}" />
+                        <ui:Button x:Name="StartButton"
+                                   Content="Start"
+                                   Appearance="Primary"
+                                   Width="92"
+                                   Command="{Binding StartCommand}" />
                         <Button x:Name="PauseButton"
                                 Content="Pause"
                                 Width="92"
@@ -188,9 +189,26 @@
                                 </Style>
                             </Button.Style>
                         </Button>
-                        <TextBlock Margin="16,0,0,0"
-                                   VerticalAlignment="Center"
-                                   Text="{Binding IsScanning, StringFormat=Scanning: {0}}" />
+                        <StackPanel Margin="16,0,0,0"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsScanning}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <ui:ProgressRing IsIndeterminate="True"
+                                             Width="16"
+                                             Height="16" />
+                            <TextBlock Text="Scanning…"
+                                       Margin="8,0,0,0"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
