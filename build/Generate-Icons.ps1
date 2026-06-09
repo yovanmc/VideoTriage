@@ -123,8 +123,8 @@ function New-IcoBytes {
         $bw.Write([byte]   $dim)
         $bw.Write([byte]   0)    # color count
         $bw.Write([byte]   0)    # reserved
-        $bw.Write([uint16] 1)    # planes
-        $bw.Write([uint16] 32)   # bit count
+        $bw.Write([uint16] 0)    # planes (0 for PNG-in-ICO per Vista+ spec)
+        $bw.Write([uint16] 0)    # bit count (0 for PNG-in-ICO per Vista+ spec)
         $bw.Write([uint32] $PngArrays[$i].Length)
         $bw.Write([uint32] $offsets[$i])
     }
