@@ -11,9 +11,9 @@ namespace VideoTriage.Core.Replace;
 public sealed class SafeReplacer(
     IFileSystem fileSystem,
     IFileRemover fileRemover,
-    Func<int>? processId = null) : ISafeReplacer
+    Func<Guid>? transactionIdFactory = null) : ISafeReplacer
 {
-    private readonly Func<int> _processId = processId ?? (() => Environment.ProcessId);
+    private readonly Func<Guid> _transactionIdFactory = transactionIdFactory ?? Guid.NewGuid;
 
     public ReplaceResult Replace(string originalPath, string verifiedReplacementPath, DeleteMode deleteMode)
     {
@@ -33,14 +33,14 @@ public sealed class SafeReplacer(
             fileSystem.FileExists(finalPath))
             return Failed(originalPath, $"Final path already exists: {finalPath}");
 
-        var pid = _processId();
+        var txId = _transactionIdFactory();
 
         // 4. Move the candidate to a DISTINCT staging path. StagingPath uses a different infix than
-        //    EncodePath, so even when the candidate is the encoder output for the same source/pid the
+        //    EncodePath, so even when the candidate is the encoder output for the same source/txId the
         //    move is never a same-path move. Moving (not copying) consumes the encode temp so it
         //    cannot leak after a successful replace, while still guaranteeing the verified bytes are
         //    on disk before the original is removed.
-        var stagingPath = TempFileNaming.StagingPath(originalPath, pid);
+        var stagingPath = TempFileNaming.StagingPath(originalPath, txId);
         fileSystem.MoveFile(verifiedReplacementPath, stagingPath);
 
         // 5. Confirm staging landed intact before we touch the original.
@@ -66,7 +66,7 @@ public sealed class SafeReplacer(
         {
             // 8. The original is already gone but the verified bytes are safe at staging. Preserve
             //    them under a partial name and report ReplacePartial — never lose data.
-            var partialPath = TempFileNaming.PartialPath(originalPath, pid);
+            var partialPath = TempFileNaming.PartialPath(originalPath, txId);
             fileSystem.MoveFile(stagingPath, partialPath);
             return new ReplaceResult
             {

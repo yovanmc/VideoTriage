@@ -224,7 +224,8 @@ public sealed class TriagePipeline(
                 continue;
             }
 
-            var encodePath = TempFileNaming.EncodePath(path, Environment.ProcessId);
+            var transactionId = Guid.NewGuid();
+            var encodePath = TempFileNaming.EncodePath(path, transactionId);
             try
             {
                 Report(path, TriagePhase.Encoding);

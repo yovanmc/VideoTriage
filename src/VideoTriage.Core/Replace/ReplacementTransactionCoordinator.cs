@@ -28,7 +28,7 @@ public sealed class ReplacementTransactionCoordinator(
         }
 
         var txId = _transactionIdFactory();
-        var stagingPath = BuildStagingPath(request.OriginalPath);
+        var stagingPath = TempFileNaming.StagingPath(request.OriginalPath, txId);
         var finalPath = Path.ChangeExtension(request.OriginalPath, ".mp4");
 
         var baseEntry = new ReplacementTransactionEntry
@@ -137,17 +137,6 @@ public sealed class ReplacementTransactionCoordinator(
             Reason = "Replacement committed.",
             OriginalRemoved = true
         };
-    }
-
-    /// <summary>
-    /// Builds the staging path for a given original. Uses the StagingInfix without a process-ID
-    /// suffix so the path is deterministic per original file within this transaction.
-    /// </summary>
-    private static string BuildStagingPath(string originalPath)
-    {
-        var dir = Path.GetDirectoryName(originalPath)!;
-        var nameWithoutExt = Path.GetFileNameWithoutExtension(originalPath);
-        return Path.Combine(dir, $"{nameWithoutExt}{TempFileNaming.StagingInfix}mp4");
     }
 
     private static DeleteManifestEntry BuildManifestEntry(

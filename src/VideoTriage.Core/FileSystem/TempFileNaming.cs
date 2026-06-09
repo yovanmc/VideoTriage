@@ -12,26 +12,26 @@ public static class TempFileNaming
     public const string PosterInfix = ".videotriage.poster.";
 
     /// <summary>The encoder writes its candidate here.</summary>
-    public static string EncodePath(string sourcePath, int processId) =>
-        Build(sourcePath, EncodeInfix, processId, ".mp4");
+    public static string EncodePath(string sourcePath, Guid transactionId) =>
+        Build(sourcePath, EncodeInfix, transactionId, ".mp4");
 
     /// <summary>
     /// SafeReplacer stages the verified candidate here before removing the original. MUST be
     /// distinct from <see cref="EncodePath"/> so moving the encoder output into staging is never a
     /// same-path move (which throws).
     /// </summary>
-    public static string StagingPath(string sourcePath, int processId) =>
-        Build(sourcePath, StagingInfix, processId, ".mp4");
+    public static string StagingPath(string sourcePath, Guid transactionId) =>
+        Build(sourcePath, StagingInfix, transactionId, ".mp4");
 
     /// <summary>Verified bytes preserved here if the final rename fails after the original is gone.</summary>
-    public static string PartialPath(string sourcePath, int processId) =>
-        Build(sourcePath, PartialInfix, processId, ".mp4");
+    public static string PartialPath(string sourcePath, Guid transactionId) =>
+        Build(sourcePath, PartialInfix, transactionId, ".mp4");
 
-    public static string PosterImagePath(string encodePath, int processId) =>
-        Build(encodePath, PosterInfix, processId, ".jpg");
+    public static string PosterImagePath(string encodePath, Guid transactionId) =>
+        Build(encodePath, PosterInfix, transactionId, ".jpg");
 
-    public static string PosterMuxPath(string encodePath, int processId) =>
-        Build(encodePath, PosterInfix, processId, ".mp4");
+    public static string PosterMuxPath(string encodePath, Guid transactionId) =>
+        Build(encodePath, PosterInfix, transactionId, ".mp4");
 
     public static bool IsTempArtifact(string path)
     {
@@ -42,8 +42,8 @@ public static class TempFileNaming
                name.Contains(PosterInfix, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string Build(string path, string infix, int processId, string extension) =>
+    private static string Build(string path, string infix, Guid transactionId, string extension) =>
         Path.Combine(
             Path.GetDirectoryName(path)!,
-            $"{Path.GetFileNameWithoutExtension(path)}{infix}{processId}{extension}");
+            $"{Path.GetFileNameWithoutExtension(path)}{infix}{transactionId:N}{extension}");
 }

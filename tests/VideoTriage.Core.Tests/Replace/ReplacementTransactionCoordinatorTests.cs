@@ -12,7 +12,7 @@ public sealed class ReplacementTransactionCoordinatorTests
     private static readonly Guid TxId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
     private const string OriginalPath = @"C:\videos\clip.mov";
     private const string ReplacementPath = @"C:\videos\clip.videotriage.tmp.mp4";
-    private const string StagingPath = @"C:\videos\clip.videotriage.staging.mp4";
+    private const string StagingPath = @"C:\videos\clip.videotriage.staging.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.mp4";
     private const string FinalPath = @"C:\videos\clip.mp4";
 
     private static ReplacementTransactionRequest MakeRequest(

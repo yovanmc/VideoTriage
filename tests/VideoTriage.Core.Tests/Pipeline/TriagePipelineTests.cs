@@ -303,7 +303,7 @@ public sealed class TriagePipelineTests
                 {
                     Outcome = f.ReplaceOutcome,
                     FinalPath = f.ReplaceOutcome == ReplaceOutcome.ReplacePartial
-                        ? TempFileNaming.PartialPath(originalPath, 1)
+                        ? TempFileNaming.PartialPath(originalPath, Guid.Empty)
                         : Path.ChangeExtension(originalPath, ".mp4"),
                     Reason = "replaced",
                     OriginalRemoved = f.ReplaceOutcome is not ReplaceOutcome.Failed
