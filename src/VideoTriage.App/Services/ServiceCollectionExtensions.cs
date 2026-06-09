@@ -87,6 +87,8 @@ public static class ServiceCollectionExtensions
                 new JsonLinesReplacementJournal(Path.Combine(dir, "replacement-journal.jsonl")),
                 sp.GetRequiredService<IFileSystem>(),
                 new CsvDeleteManifest(Path.Combine(dir, "deletions.csv"))));
+        services.AddSingleton<Func<string, IActiveRunJournal>>(
+            _ => dir => new JsonActiveRunJournal(dir));
         services.AddSingleton<ITriagePipelineProvider>(sp =>
         {
             var statuses = sp.GetRequiredService<IPrerequisiteService>().Check();
@@ -120,7 +122,8 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<Func<string, IResultLog>>(),
                 posterEmbedder,
                 sp.GetRequiredService<Func<string, IReplacementTransactionCoordinator>>(),
-                sp.GetRequiredService<Func<string, IReplacementRecovery>>());
+                sp.GetRequiredService<Func<string, IReplacementRecovery>>(),
+                sp.GetRequiredService<Func<string, IActiveRunJournal>>());
             return new TriagePipelineProvider(pipeline);
         });
         services.AddSingleton(sp =>
@@ -151,7 +154,8 @@ public static class ServiceCollectionExtensions
                 settings: settings,
                 appLog: sp.GetRequiredService<IAppLog>(),
                 userErrors: sp.GetRequiredService<IUserErrorSink>(),
-                diagnostics: sp.GetRequiredService<DiagnosticsViewModel>());
+                diagnostics: sp.GetRequiredService<DiagnosticsViewModel>(),
+                activeRunJournalFactory: sp.GetRequiredService<Func<string, IActiveRunJournal>>());
         });
         services.AddSingleton<MainWindow>();
 

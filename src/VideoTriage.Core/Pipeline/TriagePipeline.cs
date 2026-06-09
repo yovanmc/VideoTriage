@@ -29,7 +29,8 @@ public sealed class TriagePipeline(
     Func<string, IResultLog> resultLogFactory,
     IPosterEmbedder? posterEmbedder = null,
     Func<string, IReplacementTransactionCoordinator>? coordinatorFactory = null,
-    Func<string, IReplacementRecovery>? recoveryFactory = null) : ITriagePipeline
+    Func<string, IReplacementRecovery>? recoveryFactory = null,
+    Func<string, IActiveRunJournal>? activeRunJournalFactory = null) : ITriagePipeline
 {
     public async Task<TriageSummary> RunAsync(
         string folder,
@@ -48,7 +49,8 @@ public sealed class TriagePipeline(
         IDeleteManifest? deleteManifest = null;
         IResultLog? resultLog = null;
         IReplacementTransactionCoordinator? coordinator = null;
-        Guid runId = Guid.Empty;
+        IActiveRunJournal? activeJournal = null;
+        Guid runId = options.DryRun ? Guid.Empty : Guid.NewGuid();
         var completedByPath = new Dictionary<string, CompletedFileEntry>(StringComparer.OrdinalIgnoreCase);
 
         if (!options.DryRun)
@@ -66,10 +68,9 @@ public sealed class TriagePipeline(
             }
 
             if (coordinatorFactory is not null)
-            {
                 coordinator = coordinatorFactory(dataDirectory);
-                runId = Guid.NewGuid();
-            }
+
+            activeJournal = activeRunJournalFactory?.Invoke(dataDirectory);
 
             foreach (var entry in completedStore.Load())
             {
@@ -162,8 +163,31 @@ public sealed class TriagePipeline(
             }
         }
 
-        foreach (var path in discovery.FindVideos(folder, options, recursive))
+        var allFiles = discovery.FindVideos(folder, options, recursive).ToList();
+        var startedAtUtc = DateTimeOffset.UtcNow;
+
+        activeJournal?.Save(new ActiveRunState
         {
+            RunId = runId,
+            Folder = folder,
+            StartedAtUtc = startedAtUtc,
+            CompletedFiles = 0,
+            TotalFiles = allFiles.Count
+        });
+
+        foreach (var path in allFiles)
+        {
+            activeJournal?.Save(new ActiveRunState
+            {
+                RunId = runId,
+                Folder = folder,
+                StartedAtUtc = startedAtUtc,
+                CurrentFile = path,
+                CurrentPhase = TriagePhase.Probing,
+                CompletedFiles = results.Count,
+                TotalFiles = allFiles.Count
+            });
+
             Report(path, TriagePhase.Discovered);
             await WaitWhilePausedAsync(pauseToken, cancellationToken);
 
@@ -373,6 +397,7 @@ public sealed class TriagePipeline(
             }
         }
 
+        activeJournal?.Clear();
         return Summarize(results, options);
     }
 

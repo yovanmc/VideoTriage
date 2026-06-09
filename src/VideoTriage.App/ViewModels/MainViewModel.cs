@@ -8,6 +8,7 @@ using VideoTriage.App.Services;
 using VideoTriage.Core.Models;
 using VideoTriage.Core.Pipeline;
 using VideoTriage.Core.Probing;
+using VideoTriage.Core.State;
 
 namespace VideoTriage.App.ViewModels;
 
@@ -20,6 +21,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly Func<TriageOptions> _optionsFactory;
     private readonly IAppLog? _appLog;
     private readonly IUserErrorSink? _userErrors;
+    private readonly Func<string, IActiveRunJournal>? _activeRunJournalFactory;
     private CancellationTokenSource? _runCts;
     private PauseToken? _pauseToken;
     private string? _lastRunDataDirectory;
@@ -40,7 +42,8 @@ public sealed class MainViewModel : ObservableObject
         SettingsViewModel? settings = null,
         IAppLog? appLog = null,
         IUserErrorSink? userErrors = null,
-        DiagnosticsViewModel? diagnostics = null)
+        DiagnosticsViewModel? diagnostics = null,
+        Func<string, IActiveRunJournal>? activeRunJournalFactory = null)
     {
         _scanner = scanner;
         _dialogService = dialogService;
@@ -48,6 +51,7 @@ public sealed class MainViewModel : ObservableObject
         _pipelineProvider = pipelineProvider;
         _appLog = appLog;
         _userErrors = userErrors;
+        _activeRunJournalFactory = activeRunJournalFactory;
         Settings = settings;
         Diagnostics = diagnostics;
         _optionsFactory = optionsFactory
@@ -173,6 +177,18 @@ public sealed class MainViewModel : ObservableObject
                 recursive: Settings?.Recursive ?? true,
                 progress: progress,
                 cancellationToken: CancellationToken.None);
+
+            // Check for an active-run file left by a previous crash
+            var dataDirectory = Path.Combine(folder, new TriageOptions().DataDirectoryName);
+            var activeRun = _activeRunJournalFactory?.Invoke(dataDirectory)?.Load();
+            if (activeRun is not null)
+            {
+                var msg = $"⚠ Previous run was interrupted at '{Path.GetFileName(activeRun.CurrentFile ?? "?")}'" +
+                          $" (phase: {activeRun.CurrentPhase}, {activeRun.CompletedFiles}/{activeRun.TotalFiles} completed)." +
+                          " The replacement journal contains recovery information.";
+                _appLog?.Information(msg);
+                // TODO: surface in Diagnostics panel (Phase 4)
+            }
         }
         finally
         {

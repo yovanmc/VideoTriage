@@ -209,6 +209,24 @@ public sealed class TriagePipelineStateTests
         fakes.RecoveryCalls.ShouldBe(0);
     }
 
+    [Fact]
+    public async Task RunAsync_NonDryRun_SavesActiveRunBeforeEachFileAndClearsAfter()
+    {
+        var fakes = PipelineStateFakes.WithSuccessfulReplacement();
+        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        fakes.ActiveRunSaves.ShouldNotBeEmpty();
+        fakes.ActiveRunSaves.Last().CurrentFile.ShouldBe(PipelineStateFakes.FilePath);
+        fakes.ActiveRunClears.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task RunAsync_DryRun_DoesNotSaveActiveRun()
+    {
+        var fakes = PipelineStateFakes.WithSuccessfulReplacement();
+        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions { DryRun = true });
+        fakes.ActiveRunSaves.ShouldBeEmpty();
+    }
+
     private sealed class PipelineStateFakes
     {
         internal const string FilePath = @"C:\Videos\clip.mov";
@@ -234,6 +252,9 @@ public sealed class TriagePipelineStateTests
         public List<ResultLogEntry> ResultAppends { get; } = [];
         public List<string> CreatedDirectories { get; } = [];
         public List<string> StoreFactoryPaths { get; } = [];
+        public List<ActiveRunState> ActiveRunSaves { get; } = [];
+        public int ActiveRunClears { get; private set; }
+        internal void RecordActiveRunClear() => ActiveRunClears++;
 
         private readonly List<CompletedFileEntry> _preloaded = [];
         private readonly FakeRunLeaseFactory _leaseFactory = new();
@@ -272,7 +293,8 @@ public sealed class TriagePipelineStateTests
                 {
                     RecoveryCalls++;
                     return new FakeRecovery(this);
-                });
+                },
+                activeRunJournalFactory: _ => new FakeActiveRunJournal(this));
         }
 
         public static PipelineStateFakes WithSuccessfulReplacement() => new();
@@ -425,6 +447,13 @@ public sealed class TriagePipelineStateTests
                     Unrecoverable = unrecoverable
                 };
             }
+        }
+
+        private sealed class FakeActiveRunJournal(PipelineStateFakes f) : VideoTriage.Core.State.IActiveRunJournal
+        {
+            public void Save(VideoTriage.Core.State.ActiveRunState state) => f.ActiveRunSaves.Add(state);
+            public void Clear() => f.RecordActiveRunClear();
+            public VideoTriage.Core.State.ActiveRunState? Load() => null;
         }
     }
 }
