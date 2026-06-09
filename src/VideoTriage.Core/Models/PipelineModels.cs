@@ -22,6 +22,7 @@ public enum TriageOutcome
     AlreadyCompleted,
     InsufficientSpace,
     EncodeFailed,
+    ReplaceFailed,
     OutputInvalid,
     GrewKeptOriginal,
     Replaced,

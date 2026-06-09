@@ -136,7 +136,7 @@ public sealed class TriagePipelineStateTests
 
         fakes.CompletedAppends.ShouldBeEmpty();
         fakes.ManifestAppends.ShouldBeEmpty();
-        fakes.ResultAppends.Single().Outcome.ShouldBe(TriageOutcome.EncodeFailed);
+        fakes.ResultAppends.Single().Outcome.ShouldBe(TriageOutcome.ReplaceFailed);
     }
 
     [Fact]

@@ -351,7 +351,7 @@ public sealed class TriagePipeline(
                     }
                     Complete(
                         path,
-                        TriageOutcome.EncodeFailed,
+                        TriageOutcome.ReplaceFailed,
                         replace.Reason,
                         source: probe.Stats,
                         sourceLastWrite: sourceLastWrite);
@@ -386,6 +386,18 @@ public sealed class TriagePipeline(
                     source: probe.Stats,
                     sourceLastWrite: sourceLastWrite);
                 throw;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Unexpected I/O error (e.g. disk full mid-encode, file locked). Clean up the temp
+                // file best-effort and record a per-file failure so the run continues.
+                try { if (fileSystem.FileExists(encodePath)) fileSystem.DeleteFile(encodePath); } catch { }
+                Complete(
+                    path,
+                    TriageOutcome.EncodeFailed,
+                    $"Unexpected I/O failure: {ex.Message}",
+                    source: probe.Stats,
+                    sourceLastWrite: sourceLastWrite);
             }
             finally
             {
@@ -451,7 +463,7 @@ public sealed class TriagePipeline(
             Marginal = replaced.Count(f => (f.SavedPercent ?? 100) < options.MarginalThresholdPercent),
             Grew = Count(TriageOutcome.GrewKeptOriginal),
             Invalid = Count(TriageOutcome.OutputInvalid, TriageOutcome.InvalidMetadata),
-            Failed = Count(TriageOutcome.EncodeFailed, TriageOutcome.InsufficientSpace, TriageOutcome.Cancelled),
+            Failed = Count(TriageOutcome.EncodeFailed, TriageOutcome.ReplaceFailed, TriageOutcome.InsufficientSpace, TriageOutcome.Cancelled),
             Skipped = Count(
                 TriageOutcome.SkippedAlreadyAv1,
                 TriageOutcome.SkippedLowBpp,
