@@ -51,5 +51,7 @@
         <Button Margin="0,8,0,0"
                 Content="Save settings"
                 Command="{Binding SaveCommand}" />
+
+        <!-- Recursive toggle deferred to Phase 3 (Queue UX plan) -->
     </StackPanel>
 </UserControl>

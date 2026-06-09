@@ -100,6 +100,21 @@ public sealed class MainViewModelRunTests
     }
 
     [Fact]
+    public async Task StartAsync_PassesRecursiveFalse_ToPipeline()
+    {
+        var pipeline = new CapturingTriagePipeline();
+        var stubStore = new StubSettingsStore(new AppSettings { Recursive = false });
+        var settings = new SettingsViewModel(stubStore);
+        var vm = MakeViewModel(pipeline, settings: settings);
+        vm.SelectedFolder = @"C:\Videos";
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
+
+        await vm.StartCommand.ExecuteAsync(null);
+
+        pipeline.CapturedRecursive.ShouldBe(false);
+    }
+
+    [Fact]
     public void StartCommand_EmptyItems_CannotExecute()
     {
         var vm = MakeViewModel(new FakeTriagePipeline([]));
@@ -248,15 +263,16 @@ public sealed class MainViewModelRunTests
         ];
     }
 
-    private sealed class StubSettingsStore : ISettingsStore
+    private sealed class StubSettingsStore(AppSettings? seed = null) : ISettingsStore
     {
-        public AppSettings Load() => new();
+        public AppSettings Load() => seed ?? new AppSettings();
         public void Save(AppSettings settings) { }
     }
 
     private sealed class CapturingTriagePipeline : ITriagePipeline
     {
         public TriageOptions? Options { get; private set; }
+        public bool? CapturedRecursive { get; private set; }
 
         public Task<TriageSummary> RunAsync(
             string folder,
@@ -267,6 +283,7 @@ public sealed class MainViewModelRunTests
             CancellationToken cancellationToken = default)
         {
             Options = options;
+            CapturedRecursive = recursive;
             return Task.FromResult(FakeTriagePipeline.EmptySummary());
         }
     }
