@@ -25,8 +25,10 @@
                   Content="Embed poster thumbnail"
                   IsChecked="{Binding EmbedPoster}" />
         <CheckBox Margin="0,6,0,0"
-                  Content="Dry run: no encoding or file changes"
-                  IsChecked="{Binding DryRun}" />
+                  IsChecked="{Binding DryRun}">
+            <TextBlock Text="Dry run: no encoding or file changes"
+                       TextWrapping="Wrap" />
+        </CheckBox>
 
         <TextBlock Margin="0,8,0,0"
                    Foreground="#FF6B6B"
