@@ -11,75 +11,81 @@ function Draw-Icon {
     $bmp = [System.Drawing.Bitmap]::new(
         $Size, $Size,
         [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-    $g = [System.Drawing.Graphics]::FromImage($bmp)
     try {
-        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-        $g.Clear([System.Drawing.Color]::Transparent)
+        $g = [System.Drawing.Graphics]::FromImage($bmp)
+        try {
+            $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+            $g.Clear([System.Drawing.Color]::Transparent)
 
-        # Rounded-rect background (#141C28)
-        $radius = [Math]::Max(2, [int]($Size * 0.18))
-        $r2     = $radius * 2
-        $bgBrush = [System.Drawing.SolidBrush]::new(
-            [System.Drawing.Color]::FromArgb(255, 0x14, 0x1C, 0x28))
-        $bgPath = [System.Drawing.Drawing2D.GraphicsPath]::new()
-        $bgPath.AddArc(0,            0,            $r2, $r2, 180, 90)
-        $bgPath.AddArc($Size - $r2,  0,            $r2, $r2, 270, 90)
-        $bgPath.AddArc($Size - $r2,  $Size - $r2,  $r2, $r2,   0, 90)
-        $bgPath.AddArc(0,            $Size - $r2,  $r2, $r2,  90, 90)
-        $bgPath.CloseFigure()
-        $g.FillPath($bgBrush, $bgPath)
-        $bgBrush.Dispose()
-        $bgPath.Dispose()
+            # Rounded-rect background (#141C28)
+            $radius = [Math]::Max(2, [int]($Size * 0.18))
+            $r2     = $radius * 2
+            $bgBrush = [System.Drawing.SolidBrush]::new(
+                [System.Drawing.Color]::FromArgb(255, 0x14, 0x1C, 0x28))
+            $bgPath = [System.Drawing.Drawing2D.GraphicsPath]::new()
+            $bgPath.AddArc(0,            0,            $r2, $r2, 180, 90)
+            $bgPath.AddArc($Size - $r2,  0,            $r2, $r2, 270, 90)
+            $bgPath.AddArc($Size - $r2,  $Size - $r2,  $r2, $r2,   0, 90)
+            $bgPath.AddArc(0,            $Size - $r2,  $r2, $r2,  90, 90)
+            $bgPath.CloseFigure()
+            $g.FillPath($bgBrush, $bgPath)
+            $bgBrush.Dispose()
+            $bgPath.Dispose()
 
-        # Size-adaptive rules
-        $drawChevrons  = $Size -ge 32
-        $chevronCount  = if ($Size -ge 50) { 2 } else { 1 }
+            # Size-adaptive rules
+            $drawChevrons  = $Size -ge 32
 
-        # Play triangle dimensions
-        $triH    = [int]($Size * 0.55)
-        $triW    = [int]($triH * 0.866)
-        $centerY = if ($drawChevrons) { [int]($Size * 0.38) } else { [int]($Size * 0.50) }
-        $x0      = [int](($Size - $triW) / 2)
-        $y0      = [int]($centerY - $triH / 2)
+            # Play triangle dimensions
+            $triH    = [int]($Size * 0.55)
+            $triW    = [int]($triH * 0.866)
+            $centerY = if ($drawChevrons) { [int]($Size * 0.38) } else { [int]($Size * 0.50) }
+            $x0      = [int](($Size - $triW) / 2)
+            $y0      = [int]($centerY - $triH / 2)
 
-        $tealBrush = [System.Drawing.SolidBrush]::new(
-            [System.Drawing.Color]::FromArgb(255, 0x4F, 0xC3, 0xF7))
-        $triPts = [System.Drawing.PointF[]] @(
-            [System.Drawing.PointF]::new($x0,          $y0),
-            [System.Drawing.PointF]::new($x0,          $y0 + $triH),
-            [System.Drawing.PointF]::new($x0 + $triW,  $centerY)
-        )
-        $g.FillPolygon($tealBrush, $triPts)
-        $tealBrush.Dispose()
+            $tealBrush = [System.Drawing.SolidBrush]::new(
+                [System.Drawing.Color]::FromArgb(255, 0x4F, 0xC3, 0xF7))
+            $triPts = [System.Drawing.PointF[]] @(
+                [System.Drawing.PointF]::new($x0,          $y0),
+                [System.Drawing.PointF]::new($x0,          $y0 + $triH),
+                [System.Drawing.PointF]::new($x0 + $triW,  $centerY)
+            )
+            $g.FillPolygon($tealBrush, $triPts)
+            $tealBrush.Dispose()
 
-        if ($drawChevrons) {
-            $sw     = [float][Math]::Max(1.0, $Size * 0.07)
-            $cw     = [float]($triW * 0.75)
-            $ch     = [float]($Size * 0.10)
-            $cx     = [float]($Size / 2)
-            $baseY  = [float]($y0 + $triH + $Size * 0.06)
-            $gap    = [float]($Size * 0.14)
+            if ($drawChevrons) {
+                $chevronCount = if ($Size -ge 50) { 2 } else { 1 }
+                $sw     = [float][Math]::Max(1.0, $Size * 0.07)
+                $cw     = [float]($triW * 0.75)
+                $ch     = [float]($Size * 0.10)
+                $cx     = [float]($Size / 2)
+                $baseY  = [float]($y0 + $triH + $Size * 0.06)
+                $gap    = [float]($Size * 0.14)
 
-            for ($i = 0; $i -lt $chevronCount; $i++) {
-                $cy    = $baseY + $i * $gap
-                $alpha = if ($i -eq 0) { 255 } else { 128 }
-                $pen   = [System.Drawing.Pen]::new(
-                    [System.Drawing.Color]::FromArgb($alpha, 0x4F, 0xC3, 0xF7), $sw)
-                $pen.StartCap  = [System.Drawing.Drawing2D.LineCap]::Round
-                $pen.EndCap    = [System.Drawing.Drawing2D.LineCap]::Round
-                $pen.LineJoin  = [System.Drawing.Drawing2D.LineJoin]::Round
-                $chevPts = [System.Drawing.PointF[]] @(
-                    [System.Drawing.PointF]::new($cx - $cw / 2, $cy),
-                    [System.Drawing.PointF]::new($cx,            $cy + $ch),
-                    [System.Drawing.PointF]::new($cx + $cw / 2, $cy)
-                )
-                $g.DrawLines($pen, $chevPts)
-                $pen.Dispose()
+                for ($i = 0; $i -lt $chevronCount; $i++) {
+                    $cy    = $baseY + $i * $gap
+                    $alpha = if ($i -eq 0) { 255 } else { 128 }
+                    $pen   = [System.Drawing.Pen]::new(
+                        [System.Drawing.Color]::FromArgb($alpha, 0x4F, 0xC3, 0xF7), $sw)
+                    $pen.StartCap  = [System.Drawing.Drawing2D.LineCap]::Round
+                    $pen.EndCap    = [System.Drawing.Drawing2D.LineCap]::Round
+                    $pen.LineJoin  = [System.Drawing.Drawing2D.LineJoin]::Round
+                    $chevPts = [System.Drawing.PointF[]] @(
+                        [System.Drawing.PointF]::new($cx - $cw / 2, $cy),
+                        [System.Drawing.PointF]::new($cx,            $cy + $ch),
+                        [System.Drawing.PointF]::new($cx + $cw / 2, $cy)
+                    )
+                    $g.DrawLines($pen, $chevPts)
+                    $pen.Dispose()
+                }
             }
         }
+        finally {
+            $g.Dispose()
+        }
     }
-    finally {
-        $g.Dispose()
+    catch {
+        $bmp.Dispose()
+        throw
     }
     return $bmp
 }
@@ -136,6 +142,7 @@ $repoRoot  = Split-Path $PSScriptRoot -Parent
 $appAssets = Join-Path $repoRoot 'src\VideoTriage.App\Assets'
 $pkgAssets = Join-Path $repoRoot 'src\VideoTriage.Package\Assets'
 New-Item -ItemType Directory -Force -Path $appAssets | Out-Null
+New-Item -ItemType Directory -Force -Path $pkgAssets | Out-Null
 
 # ── Build ICO ──────────────────────────────────────────────────────────────────
 $icoSizes  = @(16, 24, 32, 48, 256)
