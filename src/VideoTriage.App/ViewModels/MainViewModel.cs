@@ -340,9 +340,10 @@ public sealed class MainViewModel : ObservableObject
                 _dispatcher.Post(() => row.Thumbnail = bitmap);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Thumbnail extraction is best-effort; failures leave Thumbnail as null
+            _appLog?.Information(
+                $"[Warning] Thumbnail extraction failed for '{Path.GetFileName(filePath)}': {ex.Message}");
         }
         finally
         {
