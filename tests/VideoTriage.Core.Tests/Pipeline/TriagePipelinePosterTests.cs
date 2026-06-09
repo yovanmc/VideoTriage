@@ -95,6 +95,7 @@ public sealed class TriagePipelinePosterTests
         {
             _embedderReturns = embedderReturns;
             Pipeline = new TriagePipeline(
+                new FakeRunLeaseFactory(),
                 new FakeDiscovery(),
                 new FakeProbe(this),
                 new FakeClassifier(),
@@ -263,6 +264,12 @@ public sealed class TriagePipelinePosterTests
         private sealed class NoOpResultLog : IResultLog
         {
             public void Append(ResultLogEntry entry) { }
+        }
+
+        private sealed class FakeRunLeaseFactory : IRunLeaseFactory
+        {
+            public IDisposable Acquire(string dataDirectory) => new FakeLease();
+            private sealed class FakeLease : IDisposable { public void Dispose() { } }
         }
     }
 }

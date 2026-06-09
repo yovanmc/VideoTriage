@@ -153,6 +153,26 @@ public sealed class TriagePipelineStateTests
         fakes.StoreFactoryCalls.ShouldBe(0);
     }
 
+    [Fact]
+    public async Task RunAsync_NonDryRun_AcquiresRunLease()
+    {
+        var fakes = PipelineStateFakes.WithSuccessfulReplacement();
+
+        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+
+        fakes.LeaseAcquireCalls.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task RunAsync_DryRun_DoesNotAcquireRunLease()
+    {
+        var fakes = PipelineStateFakes.WithSuccessfulReplacement();
+
+        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions { DryRun = true });
+
+        fakes.LeaseAcquireCalls.ShouldBe(0);
+    }
+
     private sealed class PipelineStateFakes
     {
         internal const string FilePath = @"C:\Videos\clip.mov";
@@ -169,6 +189,7 @@ public sealed class TriagePipelineStateTests
         public int ProbeCalls { get; private set; }
         public int CompletedLoadCalls { get; private set; }
         public int StoreFactoryCalls { get; private set; }
+        public int LeaseAcquireCalls => _leaseFactory.AcquireCalls;
 
         public List<CompletedFileEntry> CompletedAppends { get; } = [];
         public List<DeleteManifestEntry> ManifestAppends { get; } = [];
@@ -177,11 +198,13 @@ public sealed class TriagePipelineStateTests
         public List<string> StoreFactoryPaths { get; } = [];
 
         private readonly List<CompletedFileEntry> _preloaded = [];
+        private readonly FakeRunLeaseFactory _leaseFactory = new();
         public TriagePipeline Pipeline { get; }
 
         private PipelineStateFakes()
         {
             Pipeline = new TriagePipeline(
+                _leaseFactory,
                 new FakeDiscovery(),
                 new FakeProbe(this),
                 new FakeClassifier(this),
@@ -328,6 +351,17 @@ public sealed class TriagePipelineStateTests
         private sealed class FakeResultLog(PipelineStateFakes f) : IResultLog
         {
             public void Append(ResultLogEntry entry) => f.ResultAppends.Add(entry);
+        }
+
+        internal sealed class FakeRunLeaseFactory : IRunLeaseFactory
+        {
+            public int AcquireCalls { get; private set; }
+            public IDisposable Acquire(string dataDirectory)
+            {
+                AcquireCalls++;
+                return new FakeLease();
+            }
+            private sealed class FakeLease : IDisposable { public void Dispose() { } }
         }
     }
 }

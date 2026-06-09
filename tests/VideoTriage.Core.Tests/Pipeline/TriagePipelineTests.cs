@@ -197,6 +197,7 @@ public sealed class TriagePipelineTests
         private PipelineFakes()
         {
             Pipeline = new TriagePipeline(
+                new FakeRunLeaseFactory(),
                 new FakeDiscovery(this),
                 new FakeProbe(this),
                 new FakeClassifier(this),
@@ -346,6 +347,12 @@ public sealed class TriagePipelineTests
         private sealed class NoOpResultLog : IResultLog
         {
             public void Append(ResultLogEntry entry) { }
+        }
+
+        private sealed class FakeRunLeaseFactory : IRunLeaseFactory
+        {
+            public IDisposable Acquire(string dataDirectory) => new FakeLease();
+            private sealed class FakeLease : IDisposable { public void Dispose() { } }
         }
     }
 }

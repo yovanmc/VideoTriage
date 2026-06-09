@@ -63,6 +63,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<DiagnosticsViewModel>();
         services.AddSingleton<IProcessRunner, ProcessRunner>();
+        services.AddSingleton<IRunLeaseFactory, FileRunLeaseFactory>();
         services.AddSingleton<IFileSystem, PhysicalFileSystem>();
         services.AddSingleton<IVideoFileDiscovery, VideoFileDiscovery>();
         services.AddSingleton<IVideoClassifier, BppClassifier>();
@@ -95,6 +96,7 @@ public static class ServiceCollectionExtensions
                 Path.Combine(AppContext.BaseDirectory, "Encoding", "Assets", "videotriage-av1.json"),
                 "VideoTriage AV1");
             ITriagePipeline pipeline = new TriagePipeline(
+                sp.GetRequiredService<IRunLeaseFactory>(),
                 sp.GetRequiredService<IVideoFileDiscovery>(),
                 ffprobe,
                 sp.GetRequiredService<IVideoClassifier>(),

@@ -16,6 +16,7 @@ namespace VideoTriage.Core.Pipeline;
 /// The original is never touched on any failure path.
 /// </summary>
 public sealed class TriagePipeline(
+    IRunLeaseFactory runLeaseFactory,
     IVideoFileDiscovery discovery,
     IFfprobeService ffprobe,
     IVideoClassifier classifier,
@@ -40,6 +41,7 @@ public sealed class TriagePipeline(
 
         var results = new List<FileProgress>();
         var dataDirectory = Path.Combine(folder, options.DataDirectoryName);
+        using var runLease = options.DryRun ? null : runLeaseFactory.Acquire(dataDirectory);
         ICompletedFileStore? completedStore = null;
         IDeleteManifest? deleteManifest = null;
         IResultLog? resultLog = null;
