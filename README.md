@@ -1,33 +1,95 @@
 # VideoTriage
 
-Batch-compress a folder of videos to AV1 (NVEnc), keeping a new encode **only when it is
-smaller AND verified playable**, then safely removing the original. A Windows desktop app
-(WPF + Fluent) built on an engine calibrated on 1,700+ real files.
+[![CI](https://github.com/yovanmc/VideoTriage/actions/workflows/ci.yml/badge.svg)](https://github.com/yovanmc/VideoTriage/actions/workflows/ci.yml)
 
-> **[WIP]** Early development. See `docs/superpowers/plans/` for the build plan.
+VideoTriage is a Windows WPF application for finding video files that are worth recompressing,
+encoding them to AV1, and keeping a replacement only when it is smaller and passes defensive
+verification.
 
-## Prerequisites
+It grew from a PowerShell workflow calibrated on more than 1,700 real files. The product lesson was
+simple: compression is not successful until the output is proven usable and the replacement order
+protects the original.
 
-- Windows 10 or later
-- .NET 10 SDK
-- `ffmpeg` and `ffprobe` on `PATH` for probing and output verification
-- `HandBrakeCLI` on `PATH` with NVEnc AV1 10-bit support for candidate encoding
+![VideoTriage main queue](docs/assets/main-window.png)
 
-Core unit tests use fake process and tool adapters, so they do not require HandBrakeCLI.
+## Safety First
 
-## Status
-- [x] Scaffold + Fluent shell
-- [x] Core probe/classify scan API
-- [ ] Core engine (verify / safe-replace)
-- [ ] UI wiring + live progress
-- [ ] Embedded poster thumbnails
+- Dry-run stops after discovery, ffprobe metadata collection, and classification.
+- Encoded candidates must pass metadata parity checks and optional full ffmpeg decode.
+- Poster-bearing candidates are re-verified.
+- The candidate must be non-empty and smaller than the original.
+- Recycle Bin is the default deletion mode.
+- Pause, cancellation, tool failure, verification failure, low disk space, and pre-removal
+  exceptions leave the original untouched.
+- A failed final rename preserves the verified replacement as `.videotriage.partial.*.mp4`.
 
-## Non-Destructive Probe Scan
+Read the full [safety model](docs/safety.md).
 
-M2 includes a console harness that reads a folder, probes videos with `ffprobe`, and prints
-candidate classifications. It does not encode, replace, or delete files.
+## How It Fits Together
 
-```bash
-dotnet run --project src/VideoTriage.Cli -- "D:\Videos\Captures"
-dotnet run --project src/VideoTriage.Cli -- "D:\Videos\Captures" --recursive
+VideoTriage keeps WPF presentation in `VideoTriage.App` and the probing, classification, encoding,
+verification, replacement, and state policy in `VideoTriage.Core`. A non-destructive CLI harness
+also consumes Core. A separate Windows Application Packaging Project produces the x64 MSIX.
+
+See [Architecture](docs/architecture.md) for diagrams and ownership boundaries.
+
+## Requirements
+
+- Windows 10 version 1809 or newer, x64
+- ffmpeg and ffprobe on `PATH`
+- HandBrakeCLI on `PATH`
+- A supported NVIDIA GPU and driver for the shipped NVEnc AV1 preset
+
+```powershell
+winget install --exact --id Gyan.FFmpeg
+winget install --exact --id HandBrake.HandBrake.CLI
 ```
+
+The MSIX is self-contained; users do not need to install the .NET desktop runtime separately.
+
+## Install
+
+Download the `VideoTriage-win-x64-msix` artifact from a successful CI run and follow
+[Install VideoTriage](docs/installation.md). CI artifacts are test-signed and include the public
+development certificate required for installation.
+
+## Start With Dry Run
+
+1. Install and verify the external tools.
+2. Open VideoTriage and select a folder containing disposable test media.
+3. Enable **Dry run**.
+4. Review candidate classifications.
+5. Disable dry-run only after reviewing settings and the [safety model](docs/safety.md).
+
+![VideoTriage post-run summary](docs/assets/summary.png)
+
+## Build And Test
+
+```powershell
+dotnet restore src/VideoTriage.App/VideoTriage.App.csproj
+dotnet restore src/VideoTriage.Cli/VideoTriage.Cli.csproj
+dotnet restore tests/VideoTriage.Core.Tests/VideoTriage.Core.Tests.csproj
+dotnet restore tests/VideoTriage.App.Tests/VideoTriage.App.Tests.csproj
+
+dotnet build src/VideoTriage.App/VideoTriage.App.csproj -c Release --no-restore
+dotnet build src/VideoTriage.Cli/VideoTriage.Cli.csproj -c Release --no-restore
+dotnet test tests/VideoTriage.Core.Tests/VideoTriage.Core.Tests.csproj -c Release
+dotnet test tests/VideoTriage.App.Tests/VideoTriage.App.Tests.csproj -c Release
+```
+
+Core and App tests use fakes and isolated temporary directories. They do not encode, replace,
+recycle, or delete user videos.
+
+## Documentation
+
+- [Installation and partial recovery](docs/installation.md)
+- [Architecture](docs/architecture.md)
+- [Safety model](docs/safety.md)
+- [Release checklist](docs/release-checklist.md)
+- [Prototype provenance](prototype/README.md)
+
+## Release Status
+
+The repository builds a test-signed self-contained `win-x64` MSIX in CI. Tagging, pushing, GitHub
+release creation, Store submission, and production signing remain explicit maintainer-approved
+actions.
