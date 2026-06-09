@@ -151,6 +151,8 @@ public sealed class MainViewModel : ObservableObject
             var progress = new InlineProgress<ProbeResult>(result =>
                 _dispatcher.Post(() =>
                 {
+                    if (result.Classification?.Outcome != ClassificationOutcome.Candidate)
+                        return;
                     var row = new FileItemViewModel(result.FilePath);
                     row.ApplyProbe(result);
                     Items.Add(row);

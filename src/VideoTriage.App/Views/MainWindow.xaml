@@ -252,7 +252,8 @@
                                     </Border>
                                     <StackPanel Grid.Column="1" Margin="14,0">
                                         <TextBlock Text="{Binding FileName}"
-                                                   FontWeight="SemiBold" />
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" />
                                         <TextBlock Text="{Binding MetaLine}"
                                                    Opacity="0.7" />
                                         <ProgressBar Height="4"
