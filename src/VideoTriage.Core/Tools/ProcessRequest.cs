@@ -8,4 +8,5 @@ public sealed record ProcessRequest
     public TimeSpan Timeout { get; init; } = TimeSpan.FromMinutes(5);
     public string? StderrDirectory { get; init; }
     public IProgress<string>? StandardOutputLines { get; init; }
+    public IProgress<string>? StandardErrorLines { get; init; }
 }

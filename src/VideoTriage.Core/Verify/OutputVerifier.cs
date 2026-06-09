@@ -125,7 +125,7 @@ public sealed class OutputVerifier(
         string reason) =>
         new() { Outcome = outcome, Reason = reason };
 
-    private static void DeleteStderrFile(string path)
+    private static void DeleteStderrFile(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))
             return;
