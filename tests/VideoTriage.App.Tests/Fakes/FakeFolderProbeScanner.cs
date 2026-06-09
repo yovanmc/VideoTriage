@@ -7,6 +7,7 @@ public sealed class FakeFolderProbeScanner : IFolderProbeScanner
 {
     public List<ProbeResult> Results { get; } = [];
     public string? LastFolder { get; private set; }
+    public bool? LastRecursive { get; private set; }
     public TaskCompletionSource? BlockUntil { get; set; }
 
     public async Task<IReadOnlyList<ProbeResult>> ScanAsync(
@@ -17,6 +18,7 @@ public sealed class FakeFolderProbeScanner : IFolderProbeScanner
         CancellationToken cancellationToken = default)
     {
         LastFolder = folderPath;
+        LastRecursive = recursive;
         foreach (var result in Results)
             progress?.Report(result);
 

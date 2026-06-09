@@ -170,6 +170,7 @@ public sealed class MainViewModel : ObservableObject
 
             await _scanner.ScanAsync(
                 folder,
+                recursive: Settings?.Recursive ?? true,
                 progress: progress,
                 cancellationToken: CancellationToken.None);
         }
@@ -212,7 +213,7 @@ public sealed class MainViewModel : ObservableObject
             var summary = await pipeline.RunAsync(
                 SelectedFolder!,
                 options,
-                recursive: true,
+                recursive: Settings?.Recursive ?? true,
                 progress,
                 _pauseToken,
                 _runCts.Token);

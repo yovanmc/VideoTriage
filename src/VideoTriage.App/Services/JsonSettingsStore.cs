@@ -19,7 +19,7 @@ public sealed class JsonSettingsStore(string path) : ISettingsStore
         try
         {
             var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), Options);
-            return settings?.SchemaVersion == 1 ? settings : new AppSettings();
+            return settings?.SchemaVersion == 2 ? settings : new AppSettings();
         }
         catch (JsonException)
         {

@@ -1,4 +1,5 @@
 using Shouldly;
+using VideoTriage.App.Models;
 using VideoTriage.App.Services;
 using VideoTriage.App.Tests.Fakes;
 using VideoTriage.App.ViewModels;
@@ -100,6 +101,40 @@ public sealed class MainViewModelScanTests
         vm.QueueRemainingCount.ShouldBe(2);
     }
 
+    [Fact]
+    public async Task ChooseFolderAsync_DefaultSettings_PassesRecursiveTrueToScanner()
+    {
+        var scanner = new FakeFolderProbeScanner();
+        var settings = new SettingsViewModel(new StubSettingsStore());
+        var vm = new MainViewModel(
+            scanner,
+            new FakeDialogService { Result = @"C:\videos" },
+            new RecordingUiDispatcher(),
+            new AvailablePrerequisiteService(),
+            settings: settings);
+
+        await vm.ChooseFolderAsync();
+
+        scanner.LastRecursive.ShouldBe(true);
+    }
+
+    [Fact]
+    public async Task ChooseFolderAsync_RecursiveFalseInSettings_PassesRecursiveFalseToScanner()
+    {
+        var scanner = new FakeFolderProbeScanner();
+        var settings = new SettingsViewModel(new StubSettingsStore(recursive: false));
+        var vm = new MainViewModel(
+            scanner,
+            new FakeDialogService { Result = @"C:\videos" },
+            new RecordingUiDispatcher(),
+            new AvailablePrerequisiteService(),
+            settings: settings);
+
+        await vm.ChooseFolderAsync();
+
+        scanner.LastRecursive.ShouldBe(false);
+    }
+
     private static MainViewModel Create(
         FakeFolderProbeScanner scanner,
         FakeDialogService dialog,
@@ -182,5 +217,11 @@ public sealed class MainViewModelScanTests
             new("ffmpeg", true, @"C:\tools\ffmpeg.exe", ""),
             new("HandBrakeCLI", true, @"C:\tools\HandBrakeCLI.exe", "")
         ];
+    }
+
+    private sealed class StubSettingsStore(bool recursive = true) : ISettingsStore
+    {
+        public AppSettings Load() => new() { Recursive = recursive };
+        public void Save(AppSettings settings) { }
     }
 }
