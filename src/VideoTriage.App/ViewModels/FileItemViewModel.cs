@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using VideoTriage.Core.Formatting;
 using VideoTriage.Core.Models;
@@ -13,6 +14,7 @@ public sealed class FileItemViewModel : ObservableObject
     private double _progress;
     private string _savedText = "";
     private string? _finalPath;
+    private ImageSource? _thumbnail;
 
     public FileItemViewModel(string filePath)
     {
@@ -51,6 +53,12 @@ public sealed class FileItemViewModel : ObservableObject
     {
         get => _finalPath;
         private set => SetProperty(ref _finalPath, value);
+    }
+
+    public ImageSource? Thumbnail
+    {
+        get => _thumbnail;
+        internal set => SetProperty(ref _thumbnail, value);
     }
 
     public void ApplyProbe(ProbeResult result)

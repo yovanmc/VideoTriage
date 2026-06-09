@@ -245,7 +245,11 @@
                                     <Border Width="96"
                                             Height="56"
                                             CornerRadius="4"
-                                            Background="#247F7F7F" />
+                                            ClipToBounds="True"
+                                            Background="#247F7F7F">
+                                        <Image Source="{Binding Thumbnail, Mode=OneWay}"
+                                               Stretch="UniformToFill" />
+                                    </Border>
                                     <StackPanel Grid.Column="1" Margin="14,0">
                                         <TextBlock Text="{Binding FileName}"
                                                    FontWeight="SemiBold" />
