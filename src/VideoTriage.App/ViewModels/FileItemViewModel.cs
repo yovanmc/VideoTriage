@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using VideoTriage.Core.Formatting;
 using VideoTriage.Core.Models;
@@ -11,8 +12,10 @@ public sealed class FileItemViewModel : ObservableObject
     private string _metaLine = "";
     private string _statusText = "Queued";
     private double _progress;
+    private bool _isProgressIndeterminate;
     private string _savedText = "";
     private string? _finalPath;
+    private ImageSource? _thumbnail;
 
     public FileItemViewModel(string filePath)
     {
@@ -41,6 +44,12 @@ public sealed class FileItemViewModel : ObservableObject
         private set => SetProperty(ref _progress, value);
     }
 
+    public bool IsProgressIndeterminate
+    {
+        get => _isProgressIndeterminate;
+        private set => SetProperty(ref _isProgressIndeterminate, value);
+    }
+
     public string SavedText
     {
         get => _savedText;
@@ -51,6 +60,12 @@ public sealed class FileItemViewModel : ObservableObject
     {
         get => _finalPath;
         private set => SetProperty(ref _finalPath, value);
+    }
+
+    public ImageSource? Thumbnail
+    {
+        get => _thumbnail;
+        internal set => SetProperty(ref _thumbnail, value);
     }
 
     public void ApplyProbe(ProbeResult result)
@@ -110,6 +125,12 @@ public sealed class FileItemViewModel : ObservableObject
 
         if (!string.IsNullOrWhiteSpace(progressEvent.FinalPath))
             SavedText = progressEvent.FinalPath;
+
+        if (progressEvent.Phase == TriagePhase.Done)
+            Progress = 100;
+
+        IsProgressIndeterminate = progressEvent.Phase == TriagePhase.Encoding
+            && !progressEvent.EncodeProgress.HasValue;
     }
 
     private static string DoneText(FileProgress progressEvent) =>

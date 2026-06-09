@@ -92,6 +92,24 @@ public sealed class FfprobeJsonParserTests
         exception.Message.ShouldContain("frame rate");
     }
 
+    [Fact]
+    public void Parse_DetectsAttachedPicStreamIndex()
+    {
+        var stats = new FfprobeJsonParser().Parse(
+            @"C:\videos\poster.mp4", 1_000_000, Fixture("h264-with-attached-pic.json"));
+
+        stats.AttachedPicStreamIndex.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Parse_AttachedPicStreamIndexIsNullWhenNoPoster()
+    {
+        var stats = new FfprobeJsonParser().Parse(
+            @"C:\videos\a.mp4", 1_000_000, Fixture("h264-with-audio.json"));
+
+        stats.AttachedPicStreamIndex.ShouldBeNull();
+    }
+
     private static string Fixture(string fileName)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "TestData", "Ffprobe", fileName);

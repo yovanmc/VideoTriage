@@ -39,9 +39,9 @@
                     Padding="16"
                     BorderBrush="#22000000"
                     BorderThickness="0,0,1,0">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Hidden">
                 <StackPanel>
-                    <TextBlock Text="Source folder" FontWeight="SemiBold" />
+                    <TextBlock Text="Source folder" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
                     <TextBlock Margin="0,6,0,10"
                                Text="{Binding SelectedFolder}"
                                TextWrapping="Wrap"
@@ -51,7 +51,8 @@
 
                     <TextBlock Margin="0,24,0,8"
                                Text="Preset"
-                               FontWeight="SemiBold" />
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource AccentBrush}" />
                     <TextBlock Text="VideoTriage AV1" />
                     <TextBlock Text="Read-only scan before encoding"
                                Opacity="0.7"
@@ -59,18 +60,34 @@
 
                     <TextBlock Margin="0,24,0,8"
                                Text="Prerequisites"
-                               FontWeight="SemiBold" />
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource AccentBrush}" />
                     <ItemsControl ItemsSource="{Binding Prerequisites}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Grid Margin="0,3">
+                                <Grid Margin="0,3"
+                                      ToolTip="{Binding InstallHint}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="{Binding Name}" />
-                                    <TextBlock Grid.Column="1"
-                                               Text="{Binding IsAvailable}" />
+                                    <TextBlock Text="{Binding Name}"
+                                               VerticalAlignment="Center" />
+                                    <Ellipse Grid.Column="1"
+                                             Width="10"
+                                             Height="10"
+                                             VerticalAlignment="Center">
+                                        <Ellipse.Style>
+                                            <Style TargetType="Ellipse">
+                                                <Setter Property="Fill" Value="#5AD17F" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsAvailable}" Value="False">
+                                                        <Setter Property="Fill" Value="#FF6B6B" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Ellipse.Style>
+                                    </Ellipse>
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -98,10 +115,11 @@
                         BorderBrush="#22000000"
                         BorderThickness="0,0,0,1">
                     <StackPanel Orientation="Horizontal">
-                        <Button x:Name="StartButton"
-                                Content="Start"
-                                Width="92"
-                                Command="{Binding StartCommand}" />
+                        <ui:Button x:Name="StartButton"
+                                   Content="Start"
+                                   Appearance="Primary"
+                                   Width="92"
+                                   Command="{Binding StartCommand}" />
                         <Button x:Name="PauseButton"
                                 Content="Pause"
                                 Width="92"
@@ -171,9 +189,26 @@
                                 </Style>
                             </Button.Style>
                         </Button>
-                        <TextBlock Margin="16,0,0,0"
-                                   VerticalAlignment="Center"
-                                   Text="{Binding IsScanning, StringFormat=Scanning: {0}}" />
+                        <StackPanel Margin="16,0,0,0"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsScanning}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <ui:ProgressRing IsIndeterminate="True"
+                                             Width="16"
+                                             Height="16" />
+                            <TextBlock Text="Scanning…"
+                                       Margin="8,0,0,0"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
@@ -210,17 +245,23 @@
                                     <Border Width="96"
                                             Height="56"
                                             CornerRadius="4"
-                                            Background="#247F7F7F" />
+                                            ClipToBounds="True"
+                                            Background="#247F7F7F">
+                                        <Image Source="{Binding Thumbnail, Mode=OneWay}"
+                                               Stretch="UniformToFill" />
+                                    </Border>
                                     <StackPanel Grid.Column="1" Margin="14,0">
                                         <TextBlock Text="{Binding FileName}"
-                                                   FontWeight="SemiBold" />
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" />
                                         <TextBlock Text="{Binding MetaLine}"
                                                    Opacity="0.7" />
                                         <ProgressBar Height="4"
                                                      Margin="0,8,0,0"
                                                      Minimum="0"
                                                      Maximum="100"
-                                                     Value="{Binding Progress}" />
+                                                     IsIndeterminate="{Binding IsProgressIndeterminate, Mode=OneWay}"
+                                                     Value="{Binding Progress, Mode=OneWay}" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="2">
                                         <TextBlock Text="{Binding StatusText}"
@@ -257,8 +298,13 @@
                 BorderBrush="#22000000"
                 BorderThickness="0,1,0,0">
             <Grid>
-                <TextBlock VerticalAlignment="Center"
-                           Text="{Binding Items.Count, StringFormat=Queue: {0} files}" />
+                <Border VerticalAlignment="Center"
+                        BorderBrush="#735CC8FF"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="8,2">
+                    <TextBlock Text="{Binding QueueRemainingCount, StringFormat=Queue: {0} files}" />
+                </Border>
                 <TextBlock HorizontalAlignment="Right"
                            VerticalAlignment="Center"
                            Text="{Binding StatusMessage}" />

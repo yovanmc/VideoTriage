@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
+using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VideoTriage.App.Services;
@@ -26,6 +28,7 @@ public sealed class MainViewModel : ObservableObject
     private bool _isScanning;
     private RunState _runState = RunState.Idle;
     private string? _statusMessage;
+    private int _queueRemainingCount;
 
     public MainViewModel(
         IFolderProbeScanner? scanner,
@@ -131,6 +134,12 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _statusMessage, value);
     }
 
+    public int QueueRemainingCount
+    {
+        get => _queueRemainingCount;
+        private set => SetProperty(ref _queueRemainingCount, value);
+    }
+
     public async Task ChooseFolderAsync()
     {
         if (_scanner is null || IsScanning)
@@ -149,9 +158,13 @@ public sealed class MainViewModel : ObservableObject
             var progress = new InlineProgress<ProbeResult>(result =>
                 _dispatcher.Post(() =>
                 {
+                    if (result.Classification?.Outcome != ClassificationOutcome.Candidate)
+                        return;
                     var row = new FileItemViewModel(result.FilePath);
                     row.ApplyProbe(result);
                     Items.Add(row);
+                    if (result.Stats?.AttachedPicStreamIndex is { } streamIndex)
+                        _ = ExtractThumbnailAsync(row, result.FilePath, streamIndex);
                 }));
 
             await _scanner.ScanAsync(
@@ -162,6 +175,7 @@ public sealed class MainViewModel : ObservableObject
         finally
         {
             IsScanning = false;
+            QueueRemainingCount = Items.Count;
         }
     }
 
@@ -182,6 +196,7 @@ public sealed class MainViewModel : ObservableObject
         _lastRunDataDirectory = null;
         LastSummary = null;
         StatusMessage = null;
+        QueueRemainingCount = Items.Count;
         OpenDataDirectoryCommand.NotifyCanExecuteChanged();
         RunState = RunState.Running;
         try
@@ -234,13 +249,22 @@ public sealed class MainViewModel : ObservableObject
     private void ApplyProgress(FileProgress fp)
     {
         var fullPath = Path.GetFullPath(fp.FilePath);
-        foreach (var row in Items)
+        for (var i = 0; i < Items.Count; i++)
         {
-            if (string.Equals(row.FilePath, fullPath, StringComparison.OrdinalIgnoreCase))
-            {
-                row.Apply(fp);
-                return;
-            }
+            if (!string.Equals(Items[i].FilePath, fullPath, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            Items[i].Apply(fp);
+
+            if (fp.Phase == TriagePhase.Encoding && fp.EncodeProgress is null && i > 0)
+                Items.Move(i, 0);
+            else if (fp.Phase == TriagePhase.Done && i < Items.Count - 1)
+                Items.Move(i, Items.Count - 1);
+
+            if (fp.Phase == TriagePhase.Done)
+                QueueRemainingCount = Math.Max(0, QueueRemainingCount - 1);
+
+            return;
         }
     }
 
@@ -272,6 +296,7 @@ public sealed class MainViewModel : ObservableObject
     {
         _lastRunDataDirectory = null;
         LastSummary = null;
+        QueueRemainingCount = Items.Count;
         OpenDataDirectoryCommand.NotifyCanExecuteChanged();
     }
 
@@ -282,6 +307,45 @@ public sealed class MainViewModel : ObservableObject
         PauseCommand.NotifyCanExecuteChanged();
         ResumeCommand.NotifyCanExecuteChanged();
         StopCommand.NotifyCanExecuteChanged();
+    }
+
+    private async Task ExtractThumbnailAsync(FileItemViewModel row, string filePath, int streamIndex)
+    {
+        var temp = Path.Combine(Path.GetTempPath(), $"vt_thumb_{Guid.NewGuid():N}.png");
+        try
+        {
+            using var proc = new Process();
+            proc.StartInfo = new ProcessStartInfo
+            {
+                FileName = "ffmpeg",
+                Arguments = $"-i \"{filePath}\" -map 0:{streamIndex} -frames:v 1 -loglevel quiet \"{temp}\" -y",
+                CreateNoWindow = true,
+                UseShellExecute = false
+            };
+            proc.Start();
+            await proc.WaitForExitAsync();
+
+            if (proc.ExitCode == 0 && File.Exists(temp) && new FileInfo(temp).Length > 0)
+            {
+                using var memStream = new MemoryStream(File.ReadAllBytes(temp));
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.StreamSource = memStream;
+                bitmap.DecodePixelWidth = 96;
+                bitmap.EndInit();
+                bitmap.Freeze();
+                _dispatcher.Post(() => row.Thumbnail = bitmap);
+            }
+        }
+        catch
+        {
+            // Thumbnail extraction is best-effort; failures leave Thumbnail as null
+        }
+        finally
+        {
+            try { File.Delete(temp); } catch { }
+        }
     }
 
     private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>

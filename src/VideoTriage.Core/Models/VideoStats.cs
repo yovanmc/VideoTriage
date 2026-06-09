@@ -12,6 +12,7 @@ public sealed record VideoStats
     public long? VideoBitrateBitsPerSecond { get; init; }
     public long? ContainerBitrateBitsPerSecond { get; init; }
     public bool HasAudio { get; init; }
+    public int? AttachedPicStreamIndex { get; init; }
 
     public long EffectiveBitrateBitsPerSecond =>
         VideoBitrateBitsPerSecond

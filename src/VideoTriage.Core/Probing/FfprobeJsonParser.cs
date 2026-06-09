@@ -34,7 +34,8 @@ public sealed class FfprobeJsonParser
                 ContainerBitrateBitsPerSecond = TryGetFormat(root, out var format)
                     ? OptionalLong(format, "bit_rate")
                     : null,
-                HasAudio = streams.Any(IsAudioStream)
+                HasAudio = streams.Any(IsAudioStream),
+                AttachedPicStreamIndex = FindAttachedPicStreamIndex(streams)
             };
         }
         catch (JsonException exception)
@@ -43,13 +44,37 @@ public sealed class FfprobeJsonParser
         }
     }
 
-    private static bool IsVideoStream(JsonElement stream) =>
+    private static bool HasVideoCodecType(JsonElement stream) =>
         stream.TryGetProperty("codec_type", out var codecType)
         && string.Equals(codecType.GetString(), "video", StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasAttachedPicDisposition(JsonElement stream) =>
+        stream.TryGetProperty("disposition", out var disposition)
+        && disposition.TryGetProperty("attached_pic", out var flag)
+        && flag.ValueKind == JsonValueKind.Number
+        && flag.GetInt32() == 1;
+
+    private static bool IsVideoStream(JsonElement stream) =>
+        HasVideoCodecType(stream) && !HasAttachedPicDisposition(stream);
 
     private static bool IsAudioStream(JsonElement stream) =>
         stream.TryGetProperty("codec_type", out var codecType)
         && string.Equals(codecType.GetString(), "audio", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsAttachedPicStream(JsonElement stream) =>
+        HasVideoCodecType(stream) && HasAttachedPicDisposition(stream);
+
+    private static int? FindAttachedPicStreamIndex(JsonElement[] streams)
+    {
+        foreach (var stream in streams)
+        {
+            if (IsAttachedPicStream(stream)
+                && stream.TryGetProperty("index", out var idx)
+                && idx.TryGetInt32(out var value))
+                return value;
+        }
+        return null;
+    }
 
     private static string RequiredString(JsonElement element, string propertyName)
     {
