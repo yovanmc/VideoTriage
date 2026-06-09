@@ -15,6 +15,7 @@ public sealed class SettingsViewModel : ObservableObject
     private bool _embedPoster;
     private double _minimumFreeGigabytes;
     private bool _dryRun;
+    private bool _recursive;
     private bool _confirmPermanentDelete;
 
     public SettingsViewModel(ISettingsStore store)
@@ -27,6 +28,7 @@ public sealed class SettingsViewModel : ObservableObject
         _embedPoster = settings.EmbedPoster;
         _minimumFreeGigabytes = settings.MinimumFreeGigabytes;
         _dryRun = settings.DryRun;
+        _recursive = settings.Recursive;
         SaveCommand = new RelayCommand(Save, () => CanSave);
     }
 
@@ -69,6 +71,12 @@ public sealed class SettingsViewModel : ObservableObject
         set => SetValidatedProperty(ref _dryRun, value);
     }
 
+    public bool Recursive
+    {
+        get => _recursive;
+        set => SetValidatedProperty(ref _recursive, value);
+    }
+
     public bool ConfirmPermanentDelete
     {
         get => _confirmPermanentDelete;
@@ -103,7 +111,8 @@ public sealed class SettingsViewModel : ObservableObject
         DeepVerify = DeepVerify,
         EmbedPoster = EmbedPoster,
         MinimumFreeGigabytes = MinimumFreeGigabytes,
-        DryRun = DryRun
+        DryRun = DryRun,
+        Recursive = Recursive
     };
 
     private void SetValidatedProperty<T>(ref T field, T value, [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)

@@ -11,6 +11,7 @@ public sealed record AppSettings
     public bool EmbedPoster { get; init; } = true;
     public double MinimumFreeGigabytes { get; init; } = 5;
     public bool DryRun { get; init; }
+    public bool Recursive { get; init; } = true;
 
     public TriageOptions ToTriageOptions() => new()
     {
