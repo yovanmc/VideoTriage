@@ -79,10 +79,10 @@
                                              VerticalAlignment="Center">
                                         <Ellipse.Style>
                                             <Style TargetType="Ellipse">
-                                                <Setter Property="Fill" Value="#5AD17F" />
+                                                <Setter Property="Fill" Value="{StaticResource SuccessBrush}" />
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsAvailable}" Value="False">
-                                                        <Setter Property="Fill" Value="#FF6B6B" />
+                                                        <Setter Property="Fill" Value="{StaticResource DangerBrush}" />
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -119,7 +119,17 @@
                                    Content="Start"
                                    Appearance="Primary"
                                    Width="92"
-                                   Command="{Binding StartCommand}" />
+                                   Command="{Binding StartCommand}">
+                            <ui:Button.Style>
+                                <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                                    <Style.Triggers>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Opacity" Value="0.4" />
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:Button.Style>
+                        </ui:Button>
                         <Button x:Name="PauseButton"
                                 Content="Pause"
                                 Width="92"
@@ -255,7 +265,8 @@
                                                    FontWeight="SemiBold"
                                                    TextTrimming="CharacterEllipsis" />
                                         <TextBlock Text="{Binding MetaLine}"
-                                                   Opacity="0.7" />
+                                                   Opacity="0.7"
+                                                   TextTrimming="CharacterEllipsis" />
                                         <ProgressBar Height="4"
                                                      Margin="0,8,0,0"
                                                      Minimum="0"
@@ -265,7 +276,8 @@
                                     </StackPanel>
                                     <StackPanel Grid.Column="2">
                                         <TextBlock Text="{Binding StatusText}"
-                                                   HorizontalAlignment="Right" />
+                                                   HorizontalAlignment="Right"
+                                                   TextTrimming="CharacterEllipsis" />
                                         <TextBlock Text="{Binding SavedText}"
                                                    HorizontalAlignment="Right"
                                                    Foreground="{StaticResource SuccessBrush}" />
@@ -289,6 +301,28 @@
                         </Style>
                     </views:SummaryView.Style>
                 </views:SummaryView>
+                <TextBlock HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Opacity="0.45"
+                           IsHitTestVisible="False"
+                           TextAlignment="Center"
+                           Text="No candidates found.&#x0a;Choose a folder with compressible video files.">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding Items.Count}" Value="0" />
+                                        <Condition Binding="{Binding IsScanning}" Value="False" />
+                                        <Condition Binding="{Binding LastSummary}" Value="{x:Null}" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
                 </Grid>
             </Grid>
         </Grid>

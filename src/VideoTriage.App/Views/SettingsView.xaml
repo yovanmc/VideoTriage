@@ -33,7 +33,21 @@
         <TextBlock Margin="0,8,0,0"
                    Foreground="#FF6B6B"
                    TextWrapping="Wrap"
-                   Text="{Binding ValidationMessage}" />
+                   Text="{Binding ValidationMessage}">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ValidationMessage}" Value="{x:Null}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding ValidationMessage}" Value="">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
         <Button Margin="0,8,0,0"
                 Content="Save settings"
                 Command="{Binding SaveCommand}" />
