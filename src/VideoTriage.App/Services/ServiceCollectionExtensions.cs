@@ -82,6 +82,11 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<IFileSystem>(),
                 sp.GetRequiredService<IFileRemover>(),
                 new CsvDeleteManifest(Path.Combine(dir, "deletions.csv"))));
+        services.AddSingleton<Func<string, IReplacementRecovery>>(sp =>
+            dir => new ReplacementRecovery(
+                new JsonLinesReplacementJournal(Path.Combine(dir, "replacement-journal.jsonl")),
+                sp.GetRequiredService<IFileSystem>(),
+                new CsvDeleteManifest(Path.Combine(dir, "deletions.csv"))));
         services.AddSingleton<ITriagePipelineProvider>(sp =>
         {
             var statuses = sp.GetRequiredService<IPrerequisiteService>().Check();
@@ -114,7 +119,8 @@ public static class ServiceCollectionExtensions
                 sp.GetRequiredService<Func<string, IDeleteManifest>>(),
                 sp.GetRequiredService<Func<string, IResultLog>>(),
                 posterEmbedder,
-                sp.GetRequiredService<Func<string, IReplacementTransactionCoordinator>>());
+                sp.GetRequiredService<Func<string, IReplacementTransactionCoordinator>>(),
+                sp.GetRequiredService<Func<string, IReplacementRecovery>>());
             return new TriagePipelineProvider(pipeline);
         });
         services.AddSingleton(sp =>

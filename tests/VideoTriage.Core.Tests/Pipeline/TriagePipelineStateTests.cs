@@ -173,6 +173,42 @@ public sealed class TriagePipelineStateTests
         fakes.LeaseAcquireCalls.ShouldBe(0);
     }
 
+    [Fact]
+    public async Task RunAsync_RecoveryUnrecoverable_ThrowsBeforeProbe()
+    {
+        var fakes = PipelineStateFakes.WithSuccessfulReplacement();
+        fakes.RecoveryUnrecoverableCount = 1;
+
+        var ex = await Should.ThrowAsync<ReplacementRecoveryRequiredException>(
+            () => fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions()));
+
+        ex.Entries.Count.ShouldBe(1);
+        fakes.ProbeCalls.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task RunAsync_RecoveryOnlyRecovered_RunProceedsNormally()
+    {
+        var fakes = PipelineStateFakes.WithSuccessfulReplacement();
+        fakes.RecoveryUnrecoverableCount = 0; // no unrecoverable entries
+
+        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+
+        fakes.ProbeCalls.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task RunAsync_DryRun_RecoveryNotInvoked()
+    {
+        var fakes = PipelineStateFakes.WithSuccessfulReplacement();
+        fakes.RecoveryUnrecoverableCount = 1; // would fail if invoked
+
+        // DryRun must skip recovery entirely — no exception should be thrown
+        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions { DryRun = true });
+
+        fakes.RecoveryCalls.ShouldBe(0);
+    }
+
     private sealed class PipelineStateFakes
     {
         internal const string FilePath = @"C:\Videos\clip.mov";
@@ -190,6 +226,8 @@ public sealed class TriagePipelineStateTests
         public int CompletedLoadCalls { get; private set; }
         public int StoreFactoryCalls { get; private set; }
         public int LeaseAcquireCalls => _leaseFactory.AcquireCalls;
+        public int RecoveryCalls { get; private set; }
+        public int RecoveryUnrecoverableCount { get; set; } = 0;
 
         public List<CompletedFileEntry> CompletedAppends { get; } = [];
         public List<DeleteManifestEntry> ManifestAppends { get; } = [];
@@ -229,6 +267,11 @@ public sealed class TriagePipelineStateTests
                     StoreFactoryCalls++;
                     StoreFactoryPaths.Add(path);
                     return new FakeResultLog(this);
+                },
+                recoveryFactory: path =>
+                {
+                    RecoveryCalls++;
+                    return new FakeRecovery(this);
                 });
         }
 
@@ -362,6 +405,26 @@ public sealed class TriagePipelineStateTests
                 return new FakeLease();
             }
             private sealed class FakeLease : IDisposable { public void Dispose() { } }
+        }
+
+        private sealed class FakeRecovery(PipelineStateFakes f) : VideoTriage.Core.State.IReplacementRecovery
+        {
+            public VideoTriage.Core.State.ReplacementRecoveryReport Recover()
+            {
+                var unrecoverable = Enumerable.Range(0, f.RecoveryUnrecoverableCount)
+                    .Select(i => new VideoTriage.Core.State.UnrecoverableEntry
+                    {
+                        OriginalPath = $@"C:\videos\broken{i}.mov",
+                        Detail = "Both files missing."
+                    })
+                    .ToList();
+                return new VideoTriage.Core.State.ReplacementRecoveryReport
+                {
+                    Recovered = [],
+                    Cleaned = [],
+                    Unrecoverable = unrecoverable
+                };
+            }
         }
     }
 }

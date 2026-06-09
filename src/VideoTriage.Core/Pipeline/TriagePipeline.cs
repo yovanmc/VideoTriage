@@ -28,7 +28,8 @@ public sealed class TriagePipeline(
     Func<string, IDeleteManifest> deleteManifestFactory,
     Func<string, IResultLog> resultLogFactory,
     IPosterEmbedder? posterEmbedder = null,
-    Func<string, IReplacementTransactionCoordinator>? coordinatorFactory = null) : ITriagePipeline
+    Func<string, IReplacementTransactionCoordinator>? coordinatorFactory = null,
+    Func<string, IReplacementRecovery>? recoveryFactory = null) : ITriagePipeline
 {
     public async Task<TriageSummary> RunAsync(
         string folder,
@@ -56,6 +57,13 @@ public sealed class TriagePipeline(
             completedStore = completedStoreFactory(dataDirectory);
             deleteManifest = deleteManifestFactory(dataDirectory);
             resultLog = resultLogFactory(dataDirectory);
+
+            if (recoveryFactory is not null)
+            {
+                var recovery = recoveryFactory(dataDirectory).Recover();
+                if (recovery.Unrecoverable.Count > 0)
+                    throw new ReplacementRecoveryRequiredException(recovery.Unrecoverable);
+            }
 
             if (coordinatorFactory is not null)
             {
