@@ -12,6 +12,7 @@ public sealed class FileItemViewModel : ObservableObject
     private string _metaLine = "";
     private string _statusText = "Queued";
     private double _progress;
+    private bool _isProgressIndeterminate;
     private string _savedText = "";
     private string? _finalPath;
     private ImageSource? _thumbnail;
@@ -41,6 +42,12 @@ public sealed class FileItemViewModel : ObservableObject
     {
         get => _progress;
         private set => SetProperty(ref _progress, value);
+    }
+
+    public bool IsProgressIndeterminate
+    {
+        get => _isProgressIndeterminate;
+        private set => SetProperty(ref _isProgressIndeterminate, value);
     }
 
     public string SavedText
@@ -118,6 +125,12 @@ public sealed class FileItemViewModel : ObservableObject
 
         if (!string.IsNullOrWhiteSpace(progressEvent.FinalPath))
             SavedText = progressEvent.FinalPath;
+
+        if (progressEvent.Phase == TriagePhase.Done)
+            Progress = 100;
+
+        IsProgressIndeterminate = progressEvent.Phase == TriagePhase.Encoding
+            && !progressEvent.EncodeProgress.HasValue;
     }
 
     private static string DoneText(FileProgress progressEvent) =>
