@@ -22,6 +22,7 @@ public sealed class MainViewModelDiagnosticsTests
             errors,
             diagnostics);
         viewModel.SelectedFolder = @"C:\Videos";
+        viewModel.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
 
         await viewModel.StartCommand.ExecuteAsync(null);
 
@@ -46,6 +47,7 @@ public sealed class MainViewModelDiagnosticsTests
             errors,
             diagnostics);
         viewModel.SelectedFolder = @"C:\Videos";
+        viewModel.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
 
         await viewModel.StartCommand.ExecuteAsync(null);
 

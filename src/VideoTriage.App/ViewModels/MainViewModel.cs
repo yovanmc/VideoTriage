@@ -57,6 +57,7 @@ public sealed class MainViewModel : ObservableObject
             ChooseFolderAsync,
             () => _scanner is not null && !IsScanning && RunState == RunState.Idle);
         StartCommand = new AsyncRelayCommand(StartAsync, CanStart);
+        Items.CollectionChanged += (_, _) => StartCommand.NotifyCanExecuteChanged();
         PauseCommand = new RelayCommand(Pause, () => RunState == RunState.Running);
         ResumeCommand = new RelayCommand(Resume, () => RunState == RunState.Paused);
         StopCommand = new RelayCommand(
@@ -183,6 +184,7 @@ public sealed class MainViewModel : ObservableObject
         !IsScanning &&
         RunState == RunState.Idle &&
         !string.IsNullOrWhiteSpace(SelectedFolder) &&
+        Items.Count > 0 &&
         _pipelineProvider?.Pipeline is not null &&
         (Settings?.CanRun ?? true);
 

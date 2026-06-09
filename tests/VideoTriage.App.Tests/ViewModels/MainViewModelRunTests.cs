@@ -57,6 +57,7 @@ public sealed class MainViewModelRunTests
         var pipeline = new BlockingTriagePipeline();
         var vm = MakeViewModel(pipeline);
         vm.SelectedFolder = @"C:\Videos";
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
 
         var run = vm.StartCommand.ExecuteAsync(null);
         await pipeline.Started.Task.WaitAsync(TimeSpan.FromSeconds(1));
@@ -88,6 +89,7 @@ public sealed class MainViewModelRunTests
         };
         var vm = MakeViewModel(pipeline, settings: settings);
         vm.SelectedFolder = @"C:\Videos";
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
 
         await vm.StartCommand.ExecuteAsync(null);
 
@@ -95,6 +97,16 @@ public sealed class MainViewModelRunTests
         pipeline.Options.CandidateBppThreshold.ShouldBe(0.24);
         pipeline.Options.MinimumFreeGigabytes.ShouldBe(8);
         pipeline.Options.DryRun.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void StartCommand_EmptyItems_CannotExecute()
+    {
+        var vm = MakeViewModel(new FakeTriagePipeline([]));
+        vm.SelectedFolder = @"C:\Videos";
+        // Items is empty — no files were found by the scan
+
+        vm.StartCommand.CanExecute(null).ShouldBeFalse();
     }
 
     [Fact]
@@ -106,6 +118,7 @@ public sealed class MainViewModelRunTests
         };
         var vm = MakeViewModel(new FakeTriagePipeline([]), settings: settings);
         vm.SelectedFolder = @"C:\Videos";
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
 
         vm.StartCommand.CanExecute(null).ShouldBeFalse();
 
