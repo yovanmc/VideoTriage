@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
+using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VideoTriage.App.Services;
@@ -152,6 +154,8 @@ public sealed class MainViewModel : ObservableObject
                     var row = new FileItemViewModel(result.FilePath);
                     row.ApplyProbe(result);
                     Items.Add(row);
+                    if (result.Stats?.AttachedPicStreamIndex is { } streamIndex)
+                        _ = ExtractThumbnailAsync(row, result.FilePath, streamIndex);
                 }));
 
             await _scanner.ScanAsync(
@@ -282,6 +286,45 @@ public sealed class MainViewModel : ObservableObject
         PauseCommand.NotifyCanExecuteChanged();
         ResumeCommand.NotifyCanExecuteChanged();
         StopCommand.NotifyCanExecuteChanged();
+    }
+
+    private async Task ExtractThumbnailAsync(FileItemViewModel row, string filePath, int streamIndex)
+    {
+        var temp = Path.Combine(Path.GetTempPath(), $"vt_thumb_{Guid.NewGuid():N}.png");
+        try
+        {
+            using var proc = new Process();
+            proc.StartInfo = new ProcessStartInfo
+            {
+                FileName = "ffmpeg",
+                Arguments = $"-i \"{filePath}\" -map 0:{streamIndex} -frames:v 1 -loglevel quiet \"{temp}\" -y",
+                CreateNoWindow = true,
+                UseShellExecute = false
+            };
+            proc.Start();
+            await proc.WaitForExitAsync();
+
+            if (proc.ExitCode == 0 && File.Exists(temp) && new FileInfo(temp).Length > 0)
+            {
+                using var memStream = new MemoryStream(File.ReadAllBytes(temp));
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.StreamSource = memStream;
+                bitmap.DecodePixelWidth = 96;
+                bitmap.EndInit();
+                bitmap.Freeze();
+                _dispatcher.Post(() => row.Thumbnail = bitmap);
+            }
+        }
+        catch
+        {
+            // Thumbnail extraction is best-effort; failures leave Thumbnail as null
+        }
+        finally
+        {
+            try { File.Delete(temp); } catch { }
+        }
     }
 
     private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
