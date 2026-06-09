@@ -260,6 +260,7 @@
                                                      Margin="0,8,0,0"
                                                      Minimum="0"
                                                      Maximum="100"
+                                                     IsIndeterminate="{Binding IsProgressIndeterminate, Mode=OneWay}"
                                                      Value="{Binding Progress, Mode=OneWay}" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="2">
