@@ -240,13 +240,19 @@ public sealed class MainViewModel : ObservableObject
     private void ApplyProgress(FileProgress fp)
     {
         var fullPath = Path.GetFullPath(fp.FilePath);
-        foreach (var row in Items)
+        for (var i = 0; i < Items.Count; i++)
         {
-            if (string.Equals(row.FilePath, fullPath, StringComparison.OrdinalIgnoreCase))
-            {
-                row.Apply(fp);
-                return;
-            }
+            if (!string.Equals(Items[i].FilePath, fullPath, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            Items[i].Apply(fp);
+
+            if (fp.Phase == TriagePhase.Encoding && fp.EncodeProgress is null && i > 0)
+                Items.Move(i, 0);
+            else if (fp.Phase == TriagePhase.Done && i < Items.Count - 1)
+                Items.Move(i, Items.Count - 1);
+
+            return;
         }
     }
 
