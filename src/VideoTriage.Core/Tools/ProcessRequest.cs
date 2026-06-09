@@ -9,4 +9,6 @@ public sealed record ProcessRequest
     public string? StderrDirectory { get; init; }
     public IProgress<string>? StandardOutputLines { get; init; }
     public IProgress<string>? StandardErrorLines { get; init; }
+    public int StandardOutputLimitCharacters { get; init; } = 256 * 1024;
+    public Action<Exception>? ProgressCallbackError { get; init; }
 }

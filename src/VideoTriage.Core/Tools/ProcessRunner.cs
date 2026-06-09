@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text;
 
 namespace VideoTriage.Core.Tools;
 
@@ -29,8 +28,8 @@ public sealed class ProcessRunner : IProcessRunner
         var stopwatch = Stopwatch.StartNew();
         process.Start();
 
-        var stdoutTask = ReadStandardOutputAsync(process, request.StandardOutputLines);
-        var stderrTask = HandleStandardErrorAsync(process, stderrPath, request.StandardErrorLines);
+        var stdoutTask = ReadStandardOutputAsync(process, request);
+        var stderrTask = HandleStandardErrorAsync(process, stderrPath, request);
 
         var timedOut = false;
         using var timeoutCts = new CancellationTokenSource(request.Timeout);
@@ -55,7 +54,7 @@ public sealed class ProcessRunner : IProcessRunner
             await process.WaitForExitAsync(CancellationToken.None);
         }
 
-        var stdout = await stdoutTask;
+        var (stdout, truncated) = await stdoutTask;
         await stderrTask;
 
         stopwatch.Stop();
@@ -64,6 +63,7 @@ public sealed class ProcessRunner : IProcessRunner
         {
             ExitCode = timedOut ? -1 : process.ExitCode,
             StandardOutput = stdout,
+            StandardOutputTruncated = truncated,
             StandardErrorPath = stderrPath,
             Elapsed = stopwatch.Elapsed,
             TimedOut = timedOut
@@ -93,7 +93,7 @@ public sealed class ProcessRunner : IProcessRunner
     private static async Task HandleStandardErrorAsync(
         Process process,
         string? stderrPath,
-        IProgress<string>? stderrLines)
+        ProcessRequest request)
     {
         if (stderrPath is not null)
         {
@@ -103,29 +103,42 @@ public sealed class ProcessRunner : IProcessRunner
             while (await process.StandardError.ReadLineAsync() is { } line)
             {
                 await writer.WriteLineAsync(line);
-                stderrLines?.Report(line);
+                if (request.StandardErrorLines is not null)
+                {
+                    try { request.StandardErrorLines.Report(line); }
+                    catch (Exception ex) { request.ProgressCallbackError?.Invoke(ex); }
+                }
             }
         }
         else
         {
             // No file requested — drain stderr to prevent process hang on a full buffer.
             while (await process.StandardError.ReadLineAsync() is { } line)
-                stderrLines?.Report(line);
+            {
+                if (request.StandardErrorLines is not null)
+                {
+                    try { request.StandardErrorLines.Report(line); }
+                    catch (Exception ex) { request.ProgressCallbackError?.Invoke(ex); }
+                }
+            }
         }
     }
 
-    private static async Task<string> ReadStandardOutputAsync(
+    private static async Task<(string Output, bool Truncated)> ReadStandardOutputAsync(
         Process process,
-        IProgress<string>? progress)
+        ProcessRequest request)
     {
-        var output = new StringBuilder();
+        var buffer = new BoundedTextBuffer(request.StandardOutputLimitCharacters);
         while (await process.StandardOutput.ReadLineAsync() is { } line)
         {
-            progress?.Report(line);
-            output.AppendLine(line);
+            buffer.Append(line);
+            if (request.StandardOutputLines is not null)
+            {
+                try { request.StandardOutputLines.Report(line); }
+                catch (Exception ex) { request.ProgressCallbackError?.Invoke(ex); }
+            }
         }
-
-        return output.ToString();
+        return (buffer.Build(), buffer.Truncated);
     }
 
     private static void KillProcessTree(Process process)
@@ -137,6 +150,43 @@ public sealed class ProcessRunner : IProcessRunner
         }
         catch (InvalidOperationException)
         {
+        }
+    }
+}
+
+/// <summary>
+/// Fixed-capacity circular text buffer. Keeps the newest N characters, drops old lines.
+/// Thread-safe for concurrent appends.
+/// </summary>
+internal sealed class BoundedTextBuffer(int maxCharacters)
+{
+    private readonly Queue<string> _lines = new();
+    private readonly object _lock = new();
+    private int _totalChars;
+    private bool _truncated;
+
+    public bool Truncated => _truncated;
+
+    public void Append(string line)
+    {
+        lock (_lock)
+        {
+            _lines.Enqueue(line);
+            _totalChars += line.Length + Environment.NewLine.Length;
+            while (_totalChars > maxCharacters && _lines.Count > 0)
+            {
+                var removed = _lines.Dequeue();
+                _totalChars -= removed.Length + Environment.NewLine.Length;
+                _truncated = true;
+            }
+        }
+    }
+
+    public string Build()
+    {
+        lock (_lock)
+        {
+            return string.Join(Environment.NewLine, _lines);
         }
     }
 }
