@@ -34,3 +34,28 @@ public sealed record ResultLogEntry
     public double? SavedPercent { get; init; }
     public string? FinalPath { get; init; }
 }
+
+public enum ReplacementTransactionPhase
+{
+    Prepared,
+    OriginalRemoved,
+    Committed,
+    Partial,
+    Recovered
+}
+
+public sealed record ReplacementTransactionEntry
+{
+    public required Guid RunId { get; init; }
+    public required Guid TransactionId { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+    public required ReplacementTransactionPhase Phase { get; init; }
+    public required DeleteMode DeleteMode { get; init; }
+    public required string OriginalPath { get; init; }
+    public required long OriginalBytes { get; init; }
+    public required string StagingPath { get; init; }
+    public required string IntendedFinalPath { get; init; }
+    public required long ReplacementBytes { get; init; }
+    public string? ActualFinalPath { get; init; }
+    public string? Detail { get; init; }
+}
