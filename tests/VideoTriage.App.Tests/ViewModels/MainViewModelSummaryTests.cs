@@ -28,6 +28,7 @@ public sealed class MainViewModelSummaryTests
     {
         var viewModel = CreateViewModel(new CancellingPipeline());
         viewModel.SelectedFolder = @"C:\Videos";
+        viewModel.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
 
         await viewModel.StartCommand.ExecuteAsync(null);
 
@@ -57,6 +58,7 @@ public sealed class MainViewModelSummaryTests
     {
         var viewModel = CreateViewModel(new CompletingPipeline(Summary()));
         viewModel.SelectedFolder = @"C:\Videos";
+        viewModel.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
         await viewModel.StartCommand.ExecuteAsync(null);
 
         viewModel.BackToQueueCommand.Execute(null);
