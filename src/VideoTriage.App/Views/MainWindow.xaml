@@ -303,7 +303,7 @@
                         BorderThickness="1"
                         CornerRadius="4"
                         Padding="8,2">
-                    <TextBlock Text="{Binding Items.Count, StringFormat=Queue: {0} files}" />
+                    <TextBlock Text="{Binding QueueRemainingCount, StringFormat=Queue: {0} files}" />
                 </Border>
                 <TextBlock HorizontalAlignment="Right"
                            VerticalAlignment="Center"

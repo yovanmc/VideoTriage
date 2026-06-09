@@ -28,6 +28,7 @@ public sealed class MainViewModel : ObservableObject
     private bool _isScanning;
     private RunState _runState = RunState.Idle;
     private string? _statusMessage;
+    private int _queueRemainingCount;
 
     public MainViewModel(
         IFolderProbeScanner? scanner,
@@ -133,6 +134,12 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _statusMessage, value);
     }
 
+    public int QueueRemainingCount
+    {
+        get => _queueRemainingCount;
+        private set => SetProperty(ref _queueRemainingCount, value);
+    }
+
     public async Task ChooseFolderAsync()
     {
         if (_scanner is null || IsScanning)
@@ -168,6 +175,7 @@ public sealed class MainViewModel : ObservableObject
         finally
         {
             IsScanning = false;
+            QueueRemainingCount = Items.Count;
         }
     }
 
@@ -188,6 +196,7 @@ public sealed class MainViewModel : ObservableObject
         _lastRunDataDirectory = null;
         LastSummary = null;
         StatusMessage = null;
+        QueueRemainingCount = Items.Count;
         OpenDataDirectoryCommand.NotifyCanExecuteChanged();
         RunState = RunState.Running;
         try
@@ -252,6 +261,9 @@ public sealed class MainViewModel : ObservableObject
             else if (fp.Phase == TriagePhase.Done && i < Items.Count - 1)
                 Items.Move(i, Items.Count - 1);
 
+            if (fp.Phase == TriagePhase.Done)
+                QueueRemainingCount = Math.Max(0, QueueRemainingCount - 1);
+
             return;
         }
     }
@@ -284,6 +296,7 @@ public sealed class MainViewModel : ObservableObject
     {
         _lastRunDataDirectory = null;
         LastSummary = null;
+        QueueRemainingCount = Items.Count;
         OpenDataDirectoryCommand.NotifyCanExecuteChanged();
     }
 
