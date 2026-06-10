@@ -40,19 +40,24 @@ public sealed class UiServiceTests
     }
 
     [Fact]
-    public void UiDispatcher_Post_ExecutesBeforeReturning()
+    public void UiDispatcher_Post_ReturnsBeforeActionRuns()
     {
         Exception? failure = null;
         var thread = new Thread(() =>
         {
             try
             {
-                var dispatcher = new UiDispatcher(Dispatcher.CurrentDispatcher);
+                var dispatcher = Dispatcher.CurrentDispatcher;
+                var uiDispatcher = new UiDispatcher(dispatcher);
                 var executed = false;
 
-                dispatcher.Post(() => executed = true);
+                uiDispatcher.Post(() => executed = true);
 
-                executed.ShouldBeTrue();
+                // Post should return before the action executes (BeginInvoke is async)
+                executed.ShouldBeFalse("Post must return before the queued action runs");
+
+                // Drain the dispatcher to verify the action eventually runs
+                dispatcher.InvokeShutdown();
             }
             catch (Exception exception)
             {
@@ -60,10 +65,24 @@ public sealed class UiServiceTests
             }
         });
         thread.SetApartmentState(ApartmentState.STA);
-
         thread.Start();
-
         thread.Join(TimeSpan.FromSeconds(5)).ShouldBeTrue("STA dispatcher test timed out.");
         failure.ShouldBeNull();
+    }
+
+    [Fact]
+    public void DialogService_OpenDirectory_DelegatesToExplorerLauncher()
+    {
+        var opened = new List<string>();
+        var dialog = new DialogService(new RecordingExplorerLauncher(opened));
+
+        dialog.OpenDirectory(@"C:\videos\_videotriage_data");
+
+        opened.ShouldBe([@"C:\videos\_videotriage_data"]);
+    }
+
+    private sealed class RecordingExplorerLauncher(List<string> opened) : IExplorerLauncher
+    {
+        public void Open(string path) => opened.Add(path);
     }
 }

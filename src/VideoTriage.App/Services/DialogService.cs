@@ -3,7 +3,15 @@ using Microsoft.Win32;
 
 namespace VideoTriage.App.Services;
 
-public sealed class DialogService : IDialogService
+public sealed class ExplorerLauncher : IExplorerLauncher
+{
+    public void Open(string path)
+    {
+        using var process = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+    }
+}
+
+public sealed class DialogService(IExplorerLauncher explorer) : IDialogService
 {
     public string? ChooseFolder(string? initialFolder)
     {
@@ -19,10 +27,5 @@ public sealed class DialogService : IDialogService
         return dialog.ShowDialog() == true ? dialog.FolderName : null;
     }
 
-    public void OpenDirectory(string path) =>
-        Process.Start(new ProcessStartInfo
-        {
-            FileName = path,
-            UseShellExecute = true
-        });
+    public void OpenDirectory(string path) => explorer.Open(path);
 }

@@ -7,6 +7,6 @@ public sealed class UiDispatcher(Dispatcher dispatcher) : IUiDispatcher
     public void Post(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
-        dispatcher.Invoke(action);
+        dispatcher.BeginInvoke(action, DispatcherPriority.Background);
     }
 }

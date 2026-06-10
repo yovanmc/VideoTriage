@@ -50,6 +50,7 @@ public static class ServiceCollectionExtensions
     {
         services.TryAddSingleton<IToolLocator, ToolLocator>();
         services.AddSingleton<IPrerequisiteService, PrerequisiteService>();
+        services.TryAddSingleton<IExplorerLauncher, ExplorerLauncher>();
         services.TryAddSingleton<IDialogService, DialogService>();
         services.TryAddSingleton<IUiDispatcher>(
             _ => new UiDispatcher(Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher));
