@@ -94,8 +94,10 @@ public sealed class VideoFileDiscoveryTests
     public void EnumerateVideos_Recursive_SkipsReparsePointDirectories()
     {
         _walker.FilesByDirectory[@"C:\root"] = [@"C:\root\keep.mp4"];
-        _walker.Children.Add(new DirectoryEntry(@"C:\root\link",
-            FileAttributes.Directory | FileAttributes.ReparsePoint));
+        _walker.ChildrenByDirectory[@"C:\root"] =
+        [
+            new DirectoryEntry(@"C:\root\link", FileAttributes.Directory | FileAttributes.ReparsePoint)
+        ];
         _walker.FilesByDirectory[@"C:\root\link"] = [@"C:\outside\escape.mp4"];
 
         var files = _discovery.EnumerateVideos(@"C:\root", recursive: true).ToArray();
@@ -106,7 +108,10 @@ public sealed class VideoFileDiscoveryTests
     [Fact]
     public void EnumerateVideos_InaccessibleChild_ReportsWarningAndContinues()
     {
-        _walker.Children.Add(new DirectoryEntry(@"C:\root\denied", FileAttributes.Directory));
+        _walker.ChildrenByDirectory[@"C:\root"] =
+        [
+            new DirectoryEntry(@"C:\root\denied", FileAttributes.Directory)
+        ];
         _walker.Exceptions[@"C:\root\denied"] = new UnauthorizedAccessException("denied");
         _walker.FilesByDirectory[@"C:\root"] = [@"C:\root\keep.mp4"];
         var warnings = new List<DiscoveryWarning>();
@@ -134,7 +139,8 @@ public sealed class VideoFileDiscoveryTests
     {
         public Dictionary<string, List<string>> FilesByDirectory { get; } =
             new(StringComparer.OrdinalIgnoreCase);
-        public List<DirectoryEntry> Children { get; } = [];
+        public Dictionary<string, List<DirectoryEntry>> ChildrenByDirectory { get; } =
+            new(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, Exception> Exceptions { get; } =
             new(StringComparer.OrdinalIgnoreCase);
 
@@ -150,7 +156,9 @@ public sealed class VideoFileDiscoveryTests
         public IEnumerable<DirectoryEntry> GetDirectories(string directory)
         {
             if (Exceptions.TryGetValue(directory, out var ex)) throw ex;
-            return Children;
+            return ChildrenByDirectory.TryGetValue(directory, out var children)
+                ? children
+                : [];
         }
     }
 
