@@ -12,7 +12,14 @@ public sealed class ProcessRunner : IProcessRunner
             throw new ArgumentException("Process file name is required.", nameof(request));
 
         string? stderrPath = null;
-        if (request.StderrDirectory is not null)
+        if (request.StandardErrorPath is not null)
+        {
+            // Caller owns the path — use it as-is, ensure directory exists.
+            // ProcessRunner does NOT delete this file; the caller is responsible.
+            Directory.CreateDirectory(Path.GetDirectoryName(request.StandardErrorPath)!);
+            stderrPath = request.StandardErrorPath;
+        }
+        else if (request.StderrDirectory is not null)
         {
             Directory.CreateDirectory(request.StderrDirectory);
             stderrPath = Path.Combine(

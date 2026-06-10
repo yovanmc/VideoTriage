@@ -90,21 +90,34 @@ public sealed class OutputVerifier(
         string outputPath,
         CancellationToken cancellationToken)
     {
-        var processResult = await runner.RunAsync(
-            new ProcessRequest
-            {
-                FileName = ffmpegPath,
-                Arguments = ["-nostdin", "-v", "error", "-i", outputPath, "-f", "null", "-"],
-                StderrDirectory = Path.GetTempPath(),
-                Timeout = TimeSpan.FromMinutes(5)
-            },
-            cancellationToken);
+        // Generate the path before calling the runner so cleanup is deterministic
+        // even if RunAsync throws before returning a ProcessResult.
+        var stderrPath = Path.Combine(
+            Path.GetTempPath(),
+            $"videotriage-verify-{Guid.NewGuid():N}.log");
 
         try
         {
-            var firstError = File.Exists(processResult.StandardErrorPath)
-                ? FfmpegStderrFilter.FirstRealErrorLine(
-                    File.ReadLines(processResult.StandardErrorPath))
+            ProcessResult processResult;
+            try
+            {
+                processResult = await runner.RunAsync(
+                    new ProcessRequest
+                    {
+                        FileName = ffmpegPath,
+                        Arguments = ["-nostdin", "-v", "error", "-i", outputPath, "-f", "null", "-"],
+                        StandardErrorPath = stderrPath,
+                        Timeout = TimeSpan.FromMinutes(5)
+                    },
+                    cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw; // Propagate — but finally still runs to clean up the file
+            }
+
+            var firstError = File.Exists(stderrPath)
+                ? FfmpegStderrFilter.FirstRealErrorLine(File.ReadLines(stderrPath))
                 : null;
 
             if (firstError is not null)
@@ -116,7 +129,7 @@ public sealed class OutputVerifier(
         }
         finally
         {
-            DeleteStderrFile(processResult.StandardErrorPath);
+            DeleteStderrFile(stderrPath);
         }
     }
 

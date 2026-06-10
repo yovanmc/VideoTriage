@@ -148,9 +148,8 @@ public sealed class OutputVerifierTests : IDisposable
     {
         var outputPath = TempFile("output.mp4");
         var outputStats = MakeOutput(width: 640, height: 360);
-        var stderrPath = StderrFile(string.Empty);
         var probeResult = new ProbeResult { FilePath = outputPath, Stats = outputStats };
-        var runner = new FakeProcessRunner(stderrPath);
+        var runner = new FakeProcessRunner(stderrContent: string.Empty);
         var verifier = new OutputVerifier("ffmpeg.exe", runner, new FakeProbeService(probeResult));
 
         var result = await verifier.VerifyAsync(
@@ -185,9 +184,8 @@ public sealed class OutputVerifierTests : IDisposable
     {
         var outputPath = TempFile("output.mp4");
         var outputStats = MakeOutput(hasAudio: false);
-        var stderrPath = StderrFile(string.Empty);
         var probeResult = new ProbeResult { FilePath = outputPath, Stats = outputStats };
-        var runner = new FakeProcessRunner(stderrPath);
+        var runner = new FakeProcessRunner(stderrContent: string.Empty);
         var verifier = new OutputVerifier("ffmpeg.exe", runner, new FakeProbeService(probeResult));
 
         var result = await verifier.VerifyAsync(
@@ -203,9 +201,8 @@ public sealed class OutputVerifierTests : IDisposable
     {
         var outputPath = TempFile("output.mp4");
         var outputStats = MakeOutput(hasAudio: false);
-        var stderrPath = StderrFile(string.Empty);
         var probeResult = new ProbeResult { FilePath = outputPath, Stats = outputStats };
-        var runner = new FakeProcessRunner(stderrPath);
+        var runner = new FakeProcessRunner(stderrContent: string.Empty);
         var verifier = new OutputVerifier("ffmpeg.exe", runner, new FakeProbeService(probeResult));
 
         var result = await verifier.VerifyAsync(
@@ -220,10 +217,9 @@ public sealed class OutputVerifierTests : IDisposable
     public async Task VerifyAsync_DeepDecodeFindsRealError_ReturnsDecodeError()
     {
         var outputPath = TempFile("output.mp4");
-        var stderrPath = StderrFile("error while decoding MB 42 50, bytestream -7");
         var outputStats = MakeOutput();
         var probeResult = new ProbeResult { FilePath = outputPath, Stats = outputStats };
-        var runner = new FakeProcessRunner(stderrPath);
+        var runner = new FakeProcessRunner(stderrContent: "error while decoding MB 42 50, bytestream -7");
         var verifier = new OutputVerifier("ffmpeg.exe", runner, new FakeProbeService(probeResult));
 
         var result = await verifier.VerifyAsync(MakeSource(), outputPath, DefaultOptions);
@@ -236,10 +232,9 @@ public sealed class OutputVerifierTests : IDisposable
     public async Task VerifyAsync_DeepDecodeNonzeroExit_ReturnsDecodeError()
     {
         var outputPath = TempFile("output.mp4");
-        var stderrPath = StderrFile(string.Empty);
         var outputStats = MakeOutput();
         var probeResult = new ProbeResult { FilePath = outputPath, Stats = outputStats };
-        var runner = new FakeProcessRunner(stderrPath) { ExitCode = 9 };
+        var runner = new FakeProcessRunner(stderrContent: string.Empty) { ExitCode = 9 };
         var verifier = new OutputVerifier("ffmpeg.exe", runner, new FakeProbeService(probeResult));
 
         var result = await verifier.VerifyAsync(MakeSource(), outputPath, DefaultOptions);
@@ -252,28 +247,29 @@ public sealed class OutputVerifierTests : IDisposable
     public async Task VerifyAsync_DeepDecodeDeletesStderrFile()
     {
         var outputPath = TempFile("output.mp4");
-        var stderrPath = StderrFile("error while decoding frame");
         var probeResult = new ProbeResult { FilePath = outputPath, Stats = MakeOutput() };
+        var runner = new FakeProcessRunner(stderrContent: "error while decoding frame");
         var verifier = new OutputVerifier(
             "ffmpeg.exe",
-            new FakeProcessRunner(stderrPath),
+            runner,
             new FakeProbeService(probeResult));
 
         await verifier.VerifyAsync(MakeSource(), outputPath, DefaultOptions);
 
-        File.Exists(stderrPath).ShouldBeFalse();
+        // The verifier owns the path — verify it was cleaned up
+        runner.LastStderrPath.ShouldNotBeNull();
+        File.Exists(runner.LastStderrPath).ShouldBeFalse();
     }
 
     [Fact]
     public async Task VerifyAsync_DeepDecodeHasOnlyBenignDtsNoise_ReturnsValid()
     {
         var outputPath = TempFile("output.mp4");
-        var stderrPath = StderrFile(
-            "non monotonically increasing dts to muxer in stream 0\r\n" +
-            "Last message repeated 3 times");
         var outputStats = MakeOutput();
         var probeResult = new ProbeResult { FilePath = outputPath, Stats = outputStats };
-        var runner = new FakeProcessRunner(stderrPath);
+        var runner = new FakeProcessRunner(stderrContent:
+            "non monotonically increasing dts to muxer in stream 0\r\n" +
+            "Last message repeated 3 times");
         var verifier = new OutputVerifier("ffmpeg.exe", runner, new FakeProbeService(probeResult));
 
         var result = await verifier.VerifyAsync(MakeSource(), outputPath, DefaultOptions);
@@ -304,10 +300,9 @@ public sealed class OutputVerifierTests : IDisposable
     public async Task VerifyAsync_AllChecksPass_ReturnsValidWithOutputStats()
     {
         var outputPath = TempFile("output.mp4");
-        var stderrPath = StderrFile(string.Empty);
         var outputStats = MakeOutput();
         var probeResult = new ProbeResult { FilePath = outputPath, Stats = outputStats };
-        var runner = new FakeProcessRunner(stderrPath);
+        var runner = new FakeProcessRunner(stderrContent: string.Empty);
         var verifier = new OutputVerifier("ffmpeg.exe", runner, new FakeProbeService(probeResult));
 
         var result = await verifier.VerifyAsync(MakeSource(), outputPath, DefaultOptions);
@@ -321,9 +316,8 @@ public sealed class OutputVerifierTests : IDisposable
     public async Task VerifyAsync_DeepDecodeCommandUsesCorrectFfmpegArgs()
     {
         var outputPath = TempFile("output.mp4");
-        var stderrPath = StderrFile(string.Empty);
         var probeResult = new ProbeResult { FilePath = outputPath, Stats = MakeOutput() };
-        var runner = new FakeProcessRunner(stderrPath);
+        var runner = new FakeProcessRunner(stderrContent: string.Empty);
         var verifier = new OutputVerifier(
             @"C:\tools\ffmpeg.exe",
             runner,
@@ -335,17 +329,18 @@ public sealed class OutputVerifierTests : IDisposable
         runner.LastRequest!.FileName.ShouldBe(@"C:\tools\ffmpeg.exe");
         runner.LastRequest.Arguments.ShouldBe(
             ["-nostdin", "-v", "error", "-i", outputPath, "-f", "null", "-"]);
-        runner.LastRequest.StderrDirectory.ShouldNotBeNull();
+        // Verifier now owns the path; StandardErrorPath must be set (not StderrDirectory)
+        runner.LastRequest.StandardErrorPath.ShouldNotBeNull();
+        runner.LastRequest.StderrDirectory.ShouldBeNull();
     }
 
     [Fact]
     public async Task VerifyAsync_RotatedPhoneVideo_ResolutionSwapPasses()
     {
         var outputPath = TempFile("output.mp4");
-        var stderrPath = StderrFile(string.Empty);
         var outputStats = MakeOutput(width: 1920, height: 1080);
         var probeResult = new ProbeResult { FilePath = outputPath, Stats = outputStats };
-        var runner = new FakeProcessRunner(stderrPath);
+        var runner = new FakeProcessRunner(stderrContent: string.Empty);
         var verifier = new OutputVerifier("ffmpeg.exe", runner, new FakeProbeService(probeResult));
 
         var result = await verifier.VerifyAsync(
@@ -356,17 +351,52 @@ public sealed class OutputVerifierTests : IDisposable
         result.Outcome.ShouldBe(VerificationOutcome.Valid);
     }
 
+    [Fact]
+    public async Task VerifyAsync_RunnerThrowsOperationCancelled_DeletesStderrFile()
+    {
+        var outputPath = TempFile("output.mp4");
+        var probeResult = new ProbeResult { FilePath = outputPath, Stats = MakeOutput() };
+
+        string? capturedStderrPath = null;
+        var runner = new CapturingThrowingRunner(
+            ex: new OperationCanceledException(),
+            onCapture: p => capturedStderrPath = p);
+        var verifier = new OutputVerifier("ffmpeg.exe", runner, new FakeProbeService(probeResult));
+
+        // OperationCanceledException should propagate out of VerifyAsync
+        await Should.ThrowAsync<OperationCanceledException>(
+            () => verifier.VerifyAsync(MakeSource(), outputPath, DefaultOptions));
+
+        // The verifier must have deleted the file it owned, even though the runner threw
+        capturedStderrPath.ShouldNotBeNull();
+        File.Exists(capturedStderrPath).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task VerifyAsync_RunnerThrowsIOException_DeletesStderrFile()
+    {
+        var outputPath = TempFile("output.mp4");
+        var probeResult = new ProbeResult { FilePath = outputPath, Stats = MakeOutput() };
+
+        // Use a throwing runner that also records what path it would have used
+        string? capturedStderrPath = null;
+        var runner = new CapturingThrowingRunner(
+            ex: new IOException("disk full"),
+            onCapture: p => capturedStderrPath = p);
+        var verifier = new OutputVerifier("ffmpeg.exe", runner, new FakeProbeService(probeResult));
+
+        await Should.ThrowAsync<IOException>(
+            () => verifier.VerifyAsync(MakeSource(), outputPath, DefaultOptions));
+
+        // The verifier must have deleted the file it owned
+        if (capturedStderrPath is not null)
+            File.Exists(capturedStderrPath).ShouldBeFalse();
+    }
+
     private string TempFile(string name, byte[]? content = null)
     {
         var path = Path.Combine(_tempDir, name);
         File.WriteAllBytes(path, content ?? [1, 2, 3, 4]);
-        return path;
-    }
-
-    private string StderrFile(string stderrContent)
-    {
-        var path = Path.Combine(_tempDir, $"stderr-{Guid.NewGuid():N}.log");
-        File.WriteAllText(path, stderrContent);
         return path;
     }
 
@@ -412,11 +442,20 @@ public sealed class OutputVerifierTests : IDisposable
 
     private static TriageOptions DefaultOptions => new();
 
-    private sealed class FakeProcessRunner(string? stderrPath = null) : IProcessRunner
+    private sealed class FakeProcessRunner : IProcessRunner
     {
+        private readonly string? _stderrContent;
+
+        /// <summary>Creates a fake that writes <paramref name="stderrContent"/> to the caller-supplied path.</summary>
+        public FakeProcessRunner(string? stderrContent = null)
+        {
+            _stderrContent = stderrContent;
+        }
+
         public int CallCount { get; private set; }
         public int ExitCode { get; init; }
         public ProcessRequest? LastRequest { get; private set; }
+        public string? LastStderrPath { get; private set; }
 
         public Task<ProcessResult> RunAsync(
             ProcessRequest request,
@@ -424,13 +463,38 @@ public sealed class OutputVerifierTests : IDisposable
         {
             CallCount++;
             LastRequest = request;
+
+            // Write content to the caller-owned path if one was provided
+            if (request.StandardErrorPath is not null && _stderrContent is not null)
+                File.WriteAllText(request.StandardErrorPath, _stderrContent);
+
+            LastStderrPath = request.StandardErrorPath;
+
             return Task.FromResult(new ProcessResult
             {
                 ExitCode = ExitCode,
                 StandardOutput = string.Empty,
-                StandardErrorPath = stderrPath ?? string.Empty,
+                StandardErrorPath = request.StandardErrorPath ?? string.Empty,
                 Elapsed = TimeSpan.FromMilliseconds(50)
             });
+        }
+    }
+
+    /// <summary>
+    /// Captures the StandardErrorPath passed by the verifier, optionally creates the file,
+    /// then throws the supplied exception — allowing tests to verify cleanup.
+    /// </summary>
+    private sealed class CapturingThrowingRunner(Exception ex, Action<string?> onCapture) : IProcessRunner
+    {
+        public Task<ProcessResult> RunAsync(
+            ProcessRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            onCapture(request.StandardErrorPath);
+            // Create the file so there is something to delete
+            if (request.StandardErrorPath is not null)
+                File.WriteAllText(request.StandardErrorPath, string.Empty);
+            throw ex;
         }
     }
 
