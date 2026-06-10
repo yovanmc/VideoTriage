@@ -1,10 +1,11 @@
 using System.IO;
+using System.Threading;
 using System.Windows.Media.Imaging;
 using VideoTriage.Core.Tools;
 
 namespace VideoTriage.App.Services;
 
-public sealed class FfmpegThumbnailService : IThumbnailService
+public sealed class FfmpegThumbnailService : IThumbnailService, IDisposable
 {
     private readonly string _ffmpegPath;
     private readonly IProcessRunner _runner;
@@ -27,9 +28,6 @@ public sealed class FfmpegThumbnailService : IThumbnailService
         await _semaphore.WaitAsync(cancellationToken);
         try
         {
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
-
             var pngPath = _tempFileFactory();
             try
             {
@@ -38,19 +36,12 @@ public sealed class FfmpegThumbnailService : IThumbnailService
                     FileName = _ffmpegPath,
                     Arguments = ["-i", filePath, "-map", $"0:{streamIndex}", "-frames:v", "1", "-loglevel", "quiet", pngPath, "-y"],
                     Timeout = TimeSpan.FromSeconds(30)
-                }, linked.Token);
+                }, cancellationToken);
 
                 if (!File.Exists(pngPath) || new FileInfo(pngPath).Length == 0)
                     return null;
 
-                using var memStream = new MemoryStream(await File.ReadAllBytesAsync(pngPath, CancellationToken.None));
-                var bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.StreamSource = memStream;
-                bitmap.DecodePixelWidth = 96;
-                bitmap.EndInit();
-                bitmap.Freeze();
+                var bitmap = LoadBitmapOnSta(pngPath);
                 return bitmap;
             }
             finally
@@ -62,5 +53,42 @@ public sealed class FfmpegThumbnailService : IThumbnailService
         {
             _semaphore.Release();
         }
+    }
+
+    public void Dispose() => _semaphore.Dispose();
+
+    private static BitmapSource? LoadBitmapOnSta(string pngPath)
+    {
+        BitmapSource? result = null;
+        Exception? capturedException = null;
+
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                using var stream = new FileStream(pngPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                var img = new BitmapImage();
+                img.BeginInit();
+                img.CacheOption = BitmapCacheOption.OnLoad;
+                img.StreamSource = stream;
+                img.DecodePixelWidth = 96;
+                img.EndInit();
+                img.Freeze();
+                result = img;
+            }
+            catch (Exception ex)
+            {
+                capturedException = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.IsBackground = true;
+        thread.Start();
+        thread.Join();
+
+        if (capturedException is not null)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(capturedException).Throw();
+
+        return result;
     }
 }

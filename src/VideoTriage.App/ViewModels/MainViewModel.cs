@@ -152,6 +152,14 @@ public sealed class MainViewModel : ObservableObject
 
     public async Task ChooseFolderAsync()
     {
+        // Cancel previous scan's thumbnails and wait for them to drain
+        if (_scanCts is not null)
+        {
+            await CancelAndWaitAsync();
+            _scanCts.Dispose();
+            _scanCts = null;
+        }
+
         if (_scanner is null || IsScanning)
             return;
 
@@ -163,8 +171,6 @@ public sealed class MainViewModel : ObservableObject
         IsScanning = true;
         _dispatcher.Post(Items.Clear);
 
-        _scanCts?.Cancel();
-        _scanCts?.Dispose();
         _scanCts = new CancellationTokenSource();
 
         try
@@ -178,7 +184,7 @@ public sealed class MainViewModel : ObservableObject
                     row.ApplyProbe(result);
                     Items.Add(row);
                     if (result.Stats?.AttachedPicStreamIndex is { } streamIndex)
-                        TrackThumbnailAsync(row, result.FilePath, streamIndex);
+                        TrackThumbnail(row, result.FilePath, streamIndex);
                 }));
 
             await _scanner.ScanAsync(
@@ -337,14 +343,18 @@ public sealed class MainViewModel : ObservableObject
         StopCommand.NotifyCanExecuteChanged();
     }
 
-    private void TrackThumbnailAsync(FileItemViewModel row, string filePath, int streamIndex)
+    private void TrackThumbnail(FileItemViewModel row, string filePath, int streamIndex)
     {
         if (_thumbnailService is null) return;
         var cts = _scanCts;
         if (cts is null) return;
 
-        Task task = Task.CompletedTask;
-        task = Task.Run(async () =>
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        lock (_thumbnailLock)
+            _thumbnailTasks.Add(tcs.Task);
+
+        _ = Task.Run(async () =>
         {
             try
             {
@@ -360,11 +370,10 @@ public sealed class MainViewModel : ObservableObject
             finally
             {
                 lock (_thumbnailLock)
-                    _thumbnailTasks.Remove(task);
+                    _thumbnailTasks.Remove(tcs.Task);
+                tcs.SetResult();
             }
         });
-        lock (_thumbnailLock)
-            _thumbnailTasks.Add(task);
     }
 
     public async Task CancelAndWaitAsync()
