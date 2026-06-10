@@ -63,6 +63,14 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<DiagnosticsViewModel>();
         services.AddSingleton<IProcessRunner, ProcessRunner>();
+        services.AddSingleton<IThumbnailService>(sp =>
+        {
+            var statuses = sp.GetRequiredService<IPrerequisiteService>().Check();
+            var ffmpegPath = statuses.SingleOrDefault(x => x.Name == "ffmpeg" && x.IsAvailable)?.FullPath;
+            if (string.IsNullOrEmpty(ffmpegPath))
+                return new NullThumbnailService();
+            return new FfmpegThumbnailService(ffmpegPath, sp.GetRequiredService<IProcessRunner>());
+        });
         services.AddSingleton<IRunLeaseFactory, FileRunLeaseFactory>();
         services.AddSingleton<IFileSystem, PhysicalFileSystem>();
         services.AddSingleton<IVideoFileDiscovery, VideoFileDiscovery>();
@@ -155,7 +163,8 @@ public static class ServiceCollectionExtensions
                 appLog: sp.GetRequiredService<IAppLog>(),
                 userErrors: sp.GetRequiredService<IUserErrorSink>(),
                 diagnostics: sp.GetRequiredService<DiagnosticsViewModel>(),
-                activeRunJournalFactory: sp.GetRequiredService<Func<string, IActiveRunJournal>>());
+                activeRunJournalFactory: sp.GetRequiredService<Func<string, IActiveRunJournal>>(),
+                thumbnailService: sp.GetRequiredService<IThumbnailService>());
         });
         services.AddSingleton<MainWindow>();
 
@@ -171,4 +180,11 @@ public interface ITriagePipelineProvider
 public sealed class TriagePipelineProvider(ITriagePipeline? pipeline) : ITriagePipelineProvider
 {
     public ITriagePipeline? Pipeline { get; } = pipeline;
+}
+
+internal sealed class NullThumbnailService : IThumbnailService
+{
+    public Task<System.Windows.Media.Imaging.BitmapSource?> GetAsync(
+        string filePath, int streamIndex, CancellationToken cancellationToken) =>
+        Task.FromResult<System.Windows.Media.Imaging.BitmapSource?>(null);
 }

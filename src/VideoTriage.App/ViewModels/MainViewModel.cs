@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.IO;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -22,7 +21,9 @@ public sealed class MainViewModel : ObservableObject
     private readonly IAppLog? _appLog;
     private readonly IUserErrorSink? _userErrors;
     private readonly Func<string, IActiveRunJournal>? _activeRunJournalFactory;
+    private readonly IThumbnailService? _thumbnailService;
     private CancellationTokenSource? _runCts;
+    private CancellationTokenSource? _scanCts;
     private PauseToken? _pauseToken;
     private string? _lastRunDataDirectory;
     private SummaryViewModel? _lastSummary;
@@ -31,6 +32,8 @@ public sealed class MainViewModel : ObservableObject
     private RunState _runState = RunState.Idle;
     private string? _statusMessage;
     private int _queueRemainingCount;
+    private readonly HashSet<Task> _thumbnailTasks = [];
+    private readonly object _thumbnailLock = new();
 
     public MainViewModel(
         IFolderProbeScanner? scanner,
@@ -43,7 +46,8 @@ public sealed class MainViewModel : ObservableObject
         IAppLog? appLog = null,
         IUserErrorSink? userErrors = null,
         DiagnosticsViewModel? diagnostics = null,
-        Func<string, IActiveRunJournal>? activeRunJournalFactory = null)
+        Func<string, IActiveRunJournal>? activeRunJournalFactory = null,
+        IThumbnailService? thumbnailService = null)
     {
         _scanner = scanner;
         _dialogService = dialogService;
@@ -52,6 +56,7 @@ public sealed class MainViewModel : ObservableObject
         _appLog = appLog;
         _userErrors = userErrors;
         _activeRunJournalFactory = activeRunJournalFactory;
+        _thumbnailService = thumbnailService;
         Settings = settings;
         Diagnostics = diagnostics;
         _optionsFactory = optionsFactory
@@ -158,6 +163,10 @@ public sealed class MainViewModel : ObservableObject
         IsScanning = true;
         _dispatcher.Post(Items.Clear);
 
+        _scanCts?.Cancel();
+        _scanCts?.Dispose();
+        _scanCts = new CancellationTokenSource();
+
         try
         {
             var progress = new InlineProgress<ProbeResult>(result =>
@@ -169,7 +178,7 @@ public sealed class MainViewModel : ObservableObject
                     row.ApplyProbe(result);
                     Items.Add(row);
                     if (result.Stats?.AttachedPicStreamIndex is { } streamIndex)
-                        _ = ExtractThumbnailAsync(row, result.FilePath, streamIndex);
+                        TrackThumbnailAsync(row, result.FilePath, streamIndex);
                 }));
 
             await _scanner.ScanAsync(
@@ -328,44 +337,44 @@ public sealed class MainViewModel : ObservableObject
         StopCommand.NotifyCanExecuteChanged();
     }
 
-    private async Task ExtractThumbnailAsync(FileItemViewModel row, string filePath, int streamIndex)
+    private void TrackThumbnailAsync(FileItemViewModel row, string filePath, int streamIndex)
     {
-        var temp = Path.Combine(Path.GetTempPath(), $"vt_thumb_{Guid.NewGuid():N}.png");
-        try
-        {
-            using var proc = new Process();
-            proc.StartInfo = new ProcessStartInfo
-            {
-                FileName = "ffmpeg",
-                Arguments = $"-i \"{filePath}\" -map 0:{streamIndex} -frames:v 1 -loglevel quiet \"{temp}\" -y",
-                CreateNoWindow = true,
-                UseShellExecute = false
-            };
-            proc.Start();
-            await proc.WaitForExitAsync();
+        if (_thumbnailService is null) return;
+        var cts = _scanCts;
+        if (cts is null) return;
 
-            if (proc.ExitCode == 0 && File.Exists(temp) && new FileInfo(temp).Length > 0)
+        Task task = Task.CompletedTask;
+        task = Task.Run(async () =>
+        {
+            try
             {
-                using var memStream = new MemoryStream(File.ReadAllBytes(temp));
-                var bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.StreamSource = memStream;
-                bitmap.DecodePixelWidth = 96;
-                bitmap.EndInit();
-                bitmap.Freeze();
-                _dispatcher.Post(() => row.Thumbnail = bitmap);
+                var bitmap = await _thumbnailService.GetAsync(filePath, streamIndex, cts.Token);
+                if (bitmap is not null)
+                    _dispatcher.Post(() => row.Thumbnail = bitmap);
             }
-        }
-        catch (Exception ex)
-        {
-            _appLog?.Information(
-                $"[Warning] Thumbnail extraction failed for '{Path.GetFileName(filePath)}': {ex.Message}");
-        }
-        finally
-        {
-            try { File.Delete(temp); } catch { }
-        }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                _appLog?.Information($"[Warning] Thumbnail extraction failed for '{Path.GetFileName(filePath)}': {ex.Message}");
+            }
+            finally
+            {
+                lock (_thumbnailLock)
+                    _thumbnailTasks.Remove(task);
+            }
+        });
+        lock (_thumbnailLock)
+            _thumbnailTasks.Add(task);
+    }
+
+    public async Task CancelAndWaitAsync()
+    {
+        _scanCts?.Cancel();
+        Task[] pending;
+        lock (_thumbnailLock)
+            pending = [.. _thumbnailTasks];
+        if (pending.Length > 0)
+            await Task.WhenAll(pending).WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
     }
 
     private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
