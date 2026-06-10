@@ -156,7 +156,7 @@ public sealed class FfmpegThumbnailServiceTests
         var svc = new FfmpegThumbnailService("ffmpeg", runner, () => Path.Combine(Path.GetTempPath(), $"vt_thumb_{Guid.NewGuid():N}.png"));
 
         // Act (result will be null because no file is written — that's fine)
-        _ = await svc.GetAsync(@"C:\video.mp4", streamIndex: -1, CancellationToken.None);
+        _ = await svc.GetAsync(@"C:\video.mp4", streamIndex: IThumbnailService.VideoStream, CancellationToken.None);
 
         // Assert
         captured.ShouldNotBeNull();

@@ -207,7 +207,7 @@ public sealed class MainViewModel : ObservableObject
                     var row = new FileItemViewModel(result.FilePath);
                     row.ApplyProbe(result);
                     Items.Add(row);
-                    TrackThumbnail(row, result.FilePath, result.Stats?.AttachedPicStreamIndex ?? -1);
+                    TrackThumbnail(row, result.FilePath, result.Stats?.AttachedPicStreamIndex ?? IThumbnailService.VideoStream);
                 }));
 
             await _scanner.ScanAsync(
