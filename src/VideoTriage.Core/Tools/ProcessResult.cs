@@ -7,6 +7,7 @@ public sealed record ProcessResult
     public string? StandardErrorPath { get; init; }
     public required TimeSpan Elapsed { get; init; }
     public bool TimedOut { get; init; }
+    public bool StandardOutputTruncated { get; init; }
 
     public bool Succeeded => ExitCode == 0 && !TimedOut;
 }

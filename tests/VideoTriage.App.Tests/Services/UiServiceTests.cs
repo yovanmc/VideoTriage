@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows.Threading;
 using Shouldly;
 using VideoTriage.App.Services;
@@ -40,19 +41,31 @@ public sealed class UiServiceTests
     }
 
     [Fact]
-    public void UiDispatcher_Post_ExecutesBeforeReturning()
+    public void UiDispatcher_Post_ReturnsBeforeActionRuns()
     {
         Exception? failure = null;
         var thread = new Thread(() =>
         {
             try
             {
-                var dispatcher = new UiDispatcher(Dispatcher.CurrentDispatcher);
+                var dispatcher = Dispatcher.CurrentDispatcher;
+                var uiDispatcher = new UiDispatcher(dispatcher);
                 var executed = false;
 
-                dispatcher.Post(() => executed = true);
+                uiDispatcher.Post(() =>
+                {
+                    executed = true;
+                    dispatcher.InvokeShutdown();
+                });
 
-                executed.ShouldBeTrue();
+                // BeginInvoke is async: action has not run yet
+                executed.ShouldBeFalse("Post must return before the queued action runs");
+
+                // Pump the dispatcher so the background action executes
+                Dispatcher.Run();
+
+                // After the pump exits, the action must have run
+                executed.ShouldBeTrue("Action must eventually execute via the dispatcher");
             }
             catch (Exception exception)
             {
@@ -60,10 +73,41 @@ public sealed class UiServiceTests
             }
         });
         thread.SetApartmentState(ApartmentState.STA);
-
         thread.Start();
-
         thread.Join(TimeSpan.FromSeconds(5)).ShouldBeTrue("STA dispatcher test timed out.");
         failure.ShouldBeNull();
+    }
+
+    [Fact]
+    public void DialogService_OpenDirectory_DelegatesToExplorerLauncher()
+    {
+        var opened = new List<string>();
+        var dialog = new DialogService(new RecordingExplorerLauncher(opened));
+
+        dialog.OpenDirectory(@"C:\videos\_videotriage_data");
+
+        opened.ShouldBe([@"C:\videos\_videotriage_data"]);
+    }
+
+    [Fact]
+    public void ExplorerLauncher_Open_InvokesShellExecuteWithCorrectPath()
+    {
+        ProcessStartInfo? captured = null;
+        var launcher = new ExplorerLauncher(psi =>
+        {
+            captured = psi;
+            return null; // don't actually start a process in tests
+        });
+
+        launcher.Open(@"C:\videos\_videotriage_data");
+
+        captured.ShouldNotBeNull();
+        captured!.FileName.ShouldBe(@"C:\videos\_videotriage_data");
+        captured.UseShellExecute.ShouldBeTrue();
+    }
+
+    private sealed class RecordingExplorerLauncher(List<string> opened) : IExplorerLauncher
+    {
+        public void Open(string path) => opened.Add(path);
     }
 }
