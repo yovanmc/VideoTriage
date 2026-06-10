@@ -29,7 +29,7 @@ public sealed class FolderProbeScanner : IFolderProbeScanner
         options ??= new TriageOptions();
         var results = new List<ProbeResult>();
 
-        foreach (var filePath in _discovery.FindVideos(folderPath, options, recursive))
+        foreach (var filePath in _discovery.EnumerateVideos(folderPath, options, recursive))
         {
             cancellationToken.ThrowIfCancellationRequested();
 

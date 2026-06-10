@@ -185,10 +185,12 @@ public sealed class FolderProbeScannerTests
 
     private sealed class StubVideoFileDiscovery : IVideoFileDiscovery
     {
-        public IReadOnlyList<string> FindVideos(
+        public IEnumerable<string> EnumerateVideos(
             string folderPath,
             TriageOptions? options = null,
-            bool recursive = false) =>
+            bool recursive = false,
+            IProgress<DiscoveryWarning>? warnings = null,
+            CancellationToken cancellationToken = default) =>
             [];
     }
 

@@ -163,7 +163,7 @@ public sealed class TriagePipeline(
             }
         }
 
-        var allFiles = discovery.FindVideos(folder, options, recursive).ToList();
+        var allFiles = discovery.EnumerateVideos(folder, options, recursive).ToList();
         var startedAtUtc = DateTimeOffset.UtcNow;
 
         activeJournal?.Save(new ActiveRunState
