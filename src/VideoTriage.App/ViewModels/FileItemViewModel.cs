@@ -139,7 +139,11 @@ public sealed class FileItemViewModel : ObservableObject
             && progressEvent.OutputBytes.HasValue)
         {
             OldSizeText = HumanSize.Format(progressEvent.Source.FileSizeBytes);
-            var pct = (progressEvent.SavedPercent ?? 0).ToString("0.#", CultureInfo.InvariantCulture);
+            var savedPct = progressEvent.SavedPercent
+                ?? (progressEvent.Source.FileSizeBytes > 0
+                    ? (1.0 - (double)progressEvent.OutputBytes.Value / progressEvent.Source.FileSizeBytes) * 100.0
+                    : 0.0);
+            var pct = savedPct.ToString("0.#", CultureInfo.InvariantCulture);
             SavedText = $"{HumanSize.Format(progressEvent.OutputBytes.Value)}, -{pct}%";
         }
         else if (progressEvent.Phase == TriagePhase.Done)

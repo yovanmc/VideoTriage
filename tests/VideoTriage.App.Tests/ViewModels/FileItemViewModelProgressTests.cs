@@ -1,5 +1,6 @@
 using Shouldly;
 using VideoTriage.App.ViewModels;
+using VideoTriage.Core.Formatting;
 using VideoTriage.Core.Models;
 
 namespace VideoTriage.App.Tests.ViewModels;
@@ -56,7 +57,7 @@ public sealed class FileItemViewModelProgressTests
     }
 
     [Fact]
-    public void Apply_Replaced_ShowsSavedPercentAndFinalPath()
+    public void Apply_Replaced_ShowsSizeTransitionAndSavedPercentInStatus()
     {
         var vm = new FileItemViewModel(@"C:\Videos\clip.mov");
 
@@ -65,12 +66,26 @@ public sealed class FileItemViewModelProgressTests
             FilePath = @"C:\Videos\clip.mov",
             Phase = TriagePhase.Done,
             Outcome = TriageOutcome.Replaced,
-            SavedPercent = 68.7,
+            Source = new VideoStats
+            {
+                FilePath = @"C:\Videos\clip.mov",
+                CodecName = "h264",
+                Width = 1920, Height = 1080,
+                FramesPerSecond = 30,
+                Duration = TimeSpan.FromMinutes(1),
+                FileSizeBytes = 30_000_000,
+                VideoBitrateBitsPerSecond = 12_000_000,
+                HasAudio = true
+            },
+            OutputBytes = 9_750_000,
+            SavedPercent = 67.5,
             FinalPath = @"C:\Videos\clip.mp4"
         });
 
-        vm.StatusText.ShouldBe("Saved 68.7%");
-        vm.SavedText.ShouldContain(@"C:\Videos\clip.mp4");
+        vm.StatusText.ShouldBe("Saved 67.5%");
+        vm.OldSizeText.ShouldNotBeNullOrEmpty();
+        vm.SavedText.ShouldContain("-67.5%");
+        vm.FinalPath.ShouldBe(@"C:\Videos\clip.mp4");
     }
 
     [Fact]
