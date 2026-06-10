@@ -120,31 +120,36 @@ public sealed class FileItemViewModel : ObservableObject
         if (progressEvent.EncodeProgress.HasValue)
             Progress = Math.Round(progressEvent.EncodeProgress.Value * 100, 1);
 
+        double? computedSavedPct = null;
+        if (progressEvent.Phase == TriagePhase.Done
+            && progressEvent.Outcome == TriageOutcome.Replaced
+            && progressEvent.Source is not null
+            && progressEvent.OutputBytes.HasValue)
+        {
+            computedSavedPct = progressEvent.SavedPercent
+                ?? (progressEvent.Source.FileSizeBytes > 0
+                    ? (1.0 - (double)progressEvent.OutputBytes.Value / progressEvent.Source.FileSizeBytes) * 100.0
+                    : 0.0);
+        }
+
         StatusText = progressEvent.Phase switch
         {
             TriagePhase.Encoding => $"Encoding {Progress.ToString("0.#", CultureInfo.InvariantCulture)}%",
             TriagePhase.Verifying => "Verifying output",
             TriagePhase.EmbeddingPoster => "Embedding poster",
             TriagePhase.Replacing => "Replacing original",
-            TriagePhase.Done => DoneText(progressEvent),
+            TriagePhase.Done => DoneText(progressEvent, computedSavedPct),
             _ => progressEvent.Phase.ToString()
         };
 
         if (!string.IsNullOrWhiteSpace(progressEvent.FinalPath))
             FinalPath = progressEvent.FinalPath;
 
-        if (progressEvent.Phase == TriagePhase.Done
-            && progressEvent.Outcome == TriageOutcome.Replaced
-            && progressEvent.Source is not null
-            && progressEvent.OutputBytes.HasValue)
+        if (computedSavedPct.HasValue)
         {
-            OldSizeText = HumanSize.Format(progressEvent.Source.FileSizeBytes);
-            var savedPct = progressEvent.SavedPercent
-                ?? (progressEvent.Source.FileSizeBytes > 0
-                    ? (1.0 - (double)progressEvent.OutputBytes.Value / progressEvent.Source.FileSizeBytes) * 100.0
-                    : 0.0);
-            var pct = savedPct.ToString("0.#", CultureInfo.InvariantCulture);
-            SavedText = $"{HumanSize.Format(progressEvent.OutputBytes.Value)}, -{pct}%";
+            OldSizeText = HumanSize.Format(progressEvent.Source!.FileSizeBytes);
+            var pct = computedSavedPct.Value.ToString("0.#", CultureInfo.InvariantCulture);
+            SavedText = $"{HumanSize.Format(progressEvent.OutputBytes!.Value)}, -{pct}%";
         }
         else if (progressEvent.Phase == TriagePhase.Done)
         {
@@ -159,11 +164,11 @@ public sealed class FileItemViewModel : ObservableObject
             && !progressEvent.EncodeProgress.HasValue;
     }
 
-    private static string DoneText(FileProgress progressEvent) =>
+    private static string DoneText(FileProgress progressEvent, double? computedSavedPct = null) =>
         progressEvent.Outcome switch
         {
             TriageOutcome.Replaced =>
-                $"Saved {(progressEvent.SavedPercent ?? 0).ToString("0.#", CultureInfo.InvariantCulture)}%",
+                $"Saved {(computedSavedPct ?? progressEvent.SavedPercent ?? 0).ToString("0.#", CultureInfo.InvariantCulture)}%",
             TriageOutcome.ReplacePartial => "Saved as recoverable partial",
             TriageOutcome.OutputInvalid => "Verification failed; original kept",
             TriageOutcome.GrewKeptOriginal => "Encode grew; original kept",
