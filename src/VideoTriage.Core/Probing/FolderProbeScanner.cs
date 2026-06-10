@@ -31,7 +31,7 @@ public sealed class FolderProbeScanner : IFolderProbeScanner
         CancellationToken cancellationToken = default)
     {
         options ??= new TriageOptions();
-        var channel = Channel.CreateBounded<string>(_maxParallelism * 2);
+        var channel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleWriter = true });
 
         int filesDiscovered = 0;
         int candidates = 0;
