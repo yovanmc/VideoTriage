@@ -1,5 +1,6 @@
 using Shouldly;
 using VideoTriage.App.ViewModels;
+using VideoTriage.Core.Formatting;
 using VideoTriage.Core.Models;
 
 namespace VideoTriage.App.Tests.ViewModels;
@@ -51,6 +52,55 @@ public sealed class FileItemViewModelTests
 
         row.StatusText.ShouldBe("Probe failed: no video stream");
         row.MetaLine.ShouldBe("");
+    }
+
+    [Fact]
+    public void Apply_Replaced_ShowsSizeTransitionText()
+    {
+        var row = new FileItemViewModel(@"C:\videos\movie.mp4");
+        var fp = new FileProgress
+        {
+            FilePath = row.FilePath,
+            Phase = TriagePhase.Done,
+            Outcome = TriageOutcome.Replaced,
+            Source = new VideoStats
+            {
+                FilePath = row.FilePath,
+                CodecName = "h264",
+                Width = 1920, Height = 1080,
+                FramesPerSecond = 30,
+                Duration = TimeSpan.FromMinutes(1),
+                FileSizeBytes = 30_000_000,
+                VideoBitrateBitsPerSecond = 12_441_600,
+                HasAudio = true
+            },
+            OutputBytes = 19_500_000,
+            SavedPercent = 35.0,
+            FinalPath = @"C:\videos\movie.mp4"
+        };
+
+        row.Apply(fp);
+
+        row.OldSizeText.ShouldBe(HumanSize.Format(30_000_000));
+        row.SavedText.ShouldContain(HumanSize.Format(19_500_000));
+        row.SavedText.ShouldContain("-35%");
+    }
+
+    [Fact]
+    public void Apply_GrewKeptOriginal_ClearsSizeText()
+    {
+        var row = new FileItemViewModel(@"C:\videos\movie.mp4");
+        var fp = new FileProgress
+        {
+            FilePath = row.FilePath,
+            Phase = TriagePhase.Done,
+            Outcome = TriageOutcome.GrewKeptOriginal
+        };
+
+        row.Apply(fp);
+
+        row.OldSizeText.ShouldBe("");
+        row.SavedText.ShouldBe("");
     }
 
     private static ProbeResult Success(ClassificationOutcome outcome)

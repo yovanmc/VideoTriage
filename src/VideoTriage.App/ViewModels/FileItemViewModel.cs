@@ -13,6 +13,7 @@ public sealed class FileItemViewModel : ObservableObject
     private string _statusText = "Queued";
     private double _progress;
     private bool _isProgressIndeterminate;
+    private string _oldSizeText = "";
     private string _savedText = "";
     private string? _finalPath;
     private ImageSource? _thumbnail;
@@ -48,6 +49,12 @@ public sealed class FileItemViewModel : ObservableObject
     {
         get => _isProgressIndeterminate;
         private set => SetProperty(ref _isProgressIndeterminate, value);
+    }
+
+    public string OldSizeText
+    {
+        get => _oldSizeText;
+        private set => SetProperty(ref _oldSizeText, value);
     }
 
     public string SavedText
@@ -124,7 +131,22 @@ public sealed class FileItemViewModel : ObservableObject
         };
 
         if (!string.IsNullOrWhiteSpace(progressEvent.FinalPath))
-            SavedText = progressEvent.FinalPath;
+            FinalPath = progressEvent.FinalPath;
+
+        if (progressEvent.Phase == TriagePhase.Done
+            && progressEvent.Outcome == TriageOutcome.Replaced
+            && progressEvent.Source is not null
+            && progressEvent.OutputBytes.HasValue)
+        {
+            OldSizeText = HumanSize.Format(progressEvent.Source.FileSizeBytes);
+            var pct = (progressEvent.SavedPercent ?? 0).ToString("0.#", CultureInfo.InvariantCulture);
+            SavedText = $"{HumanSize.Format(progressEvent.OutputBytes.Value)}, -{pct}%";
+        }
+        else if (progressEvent.Phase == TriagePhase.Done)
+        {
+            OldSizeText = "";
+            SavedText = "";
+        }
 
         if (progressEvent.Phase == TriagePhase.Done)
             Progress = 100;
