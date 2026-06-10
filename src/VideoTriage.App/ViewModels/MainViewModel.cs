@@ -35,6 +35,11 @@ public sealed class MainViewModel : ObservableObject
     private int _queueRemainingCount;
     private readonly HashSet<Task> _thumbnailTasks = [];
     private readonly object _thumbnailLock = new();
+    private readonly Dictionary<string, FileItemViewModel> _queueIndex =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, FileProgress> _pendingProgress =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _pendingLock = new();
 
     public MainViewModel(
         IFolderProbeScanner? scanner,
@@ -69,7 +74,18 @@ public sealed class MainViewModel : ObservableObject
             ChooseFolderAsync,
             () => _scanner is not null && !IsScanning && RunState == RunState.Idle);
         StartCommand = new AsyncRelayCommand(StartAsync, CanStart);
-        Items.CollectionChanged += (_, _) => StartCommand.NotifyCanExecuteChanged();
+        Items.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+                _queueIndex.Clear();
+            if (e.NewItems is not null)
+                foreach (FileItemViewModel row in e.NewItems)
+                    _queueIndex[row.FilePath] = row;
+            if (e.OldItems is not null)
+                foreach (FileItemViewModel row in e.OldItems)
+                    _queueIndex.Remove(row.FilePath);
+            StartCommand.NotifyCanExecuteChanged();
+        };
         PauseCommand = new RelayCommand(Pause, () => RunState == RunState.Running);
         ResumeCommand = new RelayCommand(Resume, () => RunState == RunState.Paused);
         StopCommand = new RelayCommand(
@@ -228,6 +244,8 @@ public sealed class MainViewModel : ObservableObject
         if (!CanStart())
             return;
 
+        lock (_pendingLock)
+            _pendingProgress.Clear();
         _runCts = new CancellationTokenSource();
         _pauseToken = new PauseToken();
         _lastRunDataDirectory = null;
@@ -238,8 +256,7 @@ public sealed class MainViewModel : ObservableObject
         RunState = RunState.Running;
         try
         {
-            var progress = new InlineProgress<FileProgress>(fp =>
-                _dispatcher.Post(() => ApplyProgress(fp)));
+            var progress = new InlineProgress<FileProgress>(PostLatest);
             var pipeline = _pipelineProvider!.Pipeline
                 ?? throw new InvalidOperationException("Required video tools are unavailable.");
             var options = _optionsFactory();
@@ -290,23 +307,44 @@ public sealed class MainViewModel : ObservableObject
     private void ApplyProgress(FileProgress fp)
     {
         var fullPath = Path.GetFullPath(fp.FilePath);
-        for (var i = 0; i < Items.Count; i++)
-        {
-            if (!string.Equals(Items[i].FilePath, fullPath, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            Items[i].Apply(fp);
-
-            if (fp.Phase == TriagePhase.Encoding && fp.EncodeProgress is null && i > 0)
-                Items.Move(i, 0);
-            else if (fp.Phase == TriagePhase.Done && i < Items.Count - 1)
-                Items.Move(i, Items.Count - 1);
-
-            if (fp.Phase == TriagePhase.Done)
-                QueueRemainingCount = Math.Max(0, QueueRemainingCount - 1);
-
+        if (!_queueIndex.TryGetValue(fullPath, out var row))
             return;
+
+        row.Apply(fp);
+
+        var i = Items.IndexOf(row);
+        if (i < 0) return;
+
+        if (fp.Phase == TriagePhase.Encoding && fp.EncodeProgress is null && i > 0)
+            Items.Move(i, 0);
+        else if (fp.Phase == TriagePhase.Done && i < Items.Count - 1)
+            Items.Move(i, Items.Count - 1);
+
+        if (fp.Phase == TriagePhase.Done)
+            QueueRemainingCount = Math.Max(0, QueueRemainingCount - 1);
+    }
+
+    private void PostLatest(FileProgress fp)
+    {
+        bool isFirst;
+        lock (_pendingLock)
+        {
+            isFirst = !_pendingProgress.ContainsKey(fp.FilePath);
+            _pendingProgress[fp.FilePath] = fp;
         }
+
+        if (!isFirst) return;
+
+        _dispatcher.Post(() =>
+        {
+            FileProgress latest;
+            lock (_pendingLock)
+            {
+                if (!_pendingProgress.TryGetValue(fp.FilePath, out latest!)) return;
+                _pendingProgress.Remove(fp.FilePath);
+            }
+            ApplyProgress(latest);
+        });
     }
 
     private void Pause()
