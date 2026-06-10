@@ -45,7 +45,11 @@ public partial class MainWindow : FluentWindow
         finally
         {
             _closeConfirmed = true;
-            Close();
+            // Guard against re-entrant close that can occur if the STA thread
+            // drains its dispatcher during process shutdown while this window
+            // is already in a closing/closed state (e.g., ServiceProvider disposal).
+            try { Close(); }
+            catch (InvalidOperationException) { }
         }
     }
 }
