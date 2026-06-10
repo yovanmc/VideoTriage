@@ -10,7 +10,7 @@ public sealed class FakeFolderProbeScanner : IFolderProbeScanner
     public bool? LastRecursive { get; private set; }
     public TaskCompletionSource? BlockUntil { get; set; }
 
-    public async Task<IReadOnlyList<ProbeResult>> ScanAsync(
+    public async Task<FolderScanSummary> ScanAsync(
         string folderPath,
         TriageOptions? options = null,
         bool recursive = false,
@@ -25,6 +25,11 @@ public sealed class FakeFolderProbeScanner : IFolderProbeScanner
         if (BlockUntil is not null)
             await BlockUntil.Task.WaitAsync(cancellationToken);
 
-        return Results;
+        return new FolderScanSummary
+        {
+            FilesDiscovered = Results.Count,
+            CandidateCount = Results.Count(r => r.Classification?.Outcome == ClassificationOutcome.Candidate),
+            ProbeFailureCount = Results.Count(r => r.Failure is not null),
+        };
     }
 }

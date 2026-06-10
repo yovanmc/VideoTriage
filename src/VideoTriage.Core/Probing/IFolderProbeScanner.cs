@@ -4,7 +4,7 @@ namespace VideoTriage.Core.Probing;
 
 public interface IFolderProbeScanner
 {
-    Task<IReadOnlyList<ProbeResult>> ScanAsync(
+    Task<FolderScanSummary> ScanAsync(
         string folderPath,
         TriageOptions? options = null,
         bool recursive = false,

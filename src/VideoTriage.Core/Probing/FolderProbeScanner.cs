@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using VideoTriage.Core.FileSystem;
 using VideoTriage.Core.Models;
 
@@ -8,18 +9,21 @@ public sealed class FolderProbeScanner : IFolderProbeScanner
     private readonly IVideoFileDiscovery _discovery;
     private readonly IFfprobeService _ffprobeService;
     private readonly IVideoClassifier _classifier;
+    private readonly int _maxParallelism;
 
     public FolderProbeScanner(
         IVideoFileDiscovery discovery,
         IFfprobeService ffprobeService,
-        IVideoClassifier classifier)
+        IVideoClassifier classifier,
+        int maxParallelism = 4)
     {
         _discovery = discovery ?? throw new ArgumentNullException(nameof(discovery));
         _ffprobeService = ffprobeService ?? throw new ArgumentNullException(nameof(ffprobeService));
         _classifier = classifier ?? throw new ArgumentNullException(nameof(classifier));
+        _maxParallelism = maxParallelism > 0 ? maxParallelism : throw new ArgumentOutOfRangeException(nameof(maxParallelism));
     }
 
-    public async Task<IReadOnlyList<ProbeResult>> ScanAsync(
+    public async Task<FolderScanSummary> ScanAsync(
         string folderPath,
         TriageOptions? options = null,
         bool recursive = false,
@@ -27,21 +31,55 @@ public sealed class FolderProbeScanner : IFolderProbeScanner
         CancellationToken cancellationToken = default)
     {
         options ??= new TriageOptions();
-        var results = new List<ProbeResult>();
+        var channel = Channel.CreateBounded<string>(_maxParallelism * 2);
 
-        foreach (var filePath in _discovery.EnumerateVideos(folderPath, options, recursive))
+        int filesDiscovered = 0;
+        int candidates = 0;
+        int failures = 0;
+
+        // Producer: enumerate files, write into channel
+        var producer = Task.Run(async () =>
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                foreach (var file in _discovery.EnumerateVideos(folderPath, options, recursive, cancellationToken: cancellationToken))
+                {
+                    Interlocked.Increment(ref filesDiscovered);
+                    await channel.Writer.WriteAsync(file, cancellationToken);
+                }
+            }
+            finally
+            {
+                channel.Writer.TryComplete();
+            }
+        }, cancellationToken);
 
-            var probeResult = await _ffprobeService.ProbeAsync(filePath, cancellationToken);
-            var completedResult = probeResult.Stats is null
-                ? probeResult
-                : probeResult with { Classification = _classifier.Classify(probeResult.Stats, options) };
+        // Consumers: probe files in parallel, classify, report
+        var workers = Enumerable.Range(0, _maxParallelism).Select(_ => Task.Run(async () =>
+        {
+            await foreach (var file in channel.Reader.ReadAllAsync(cancellationToken))
+            {
+                var result = await _ffprobeService.ProbeAsync(file, cancellationToken);
+                var classified = result.Stats is null
+                    ? result
+                    : result with { Classification = _classifier.Classify(result.Stats, options) };
 
-            results.Add(completedResult);
-            progress?.Report(completedResult);
-        }
+                if (classified.Failure is not null)
+                    Interlocked.Increment(ref failures);
+                else if (classified.Classification?.Outcome == ClassificationOutcome.Candidate)
+                    Interlocked.Increment(ref candidates);
 
-        return results;
+                progress?.Report(classified);
+            }
+        }, cancellationToken)).ToArray();
+
+        await Task.WhenAll([producer, .. workers]);
+
+        return new FolderScanSummary
+        {
+            FilesDiscovered = filesDiscovered,
+            CandidateCount = candidates,
+            ProbeFailureCount = failures,
+        };
     }
 }

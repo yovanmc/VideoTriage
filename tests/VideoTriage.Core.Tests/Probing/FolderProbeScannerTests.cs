@@ -18,9 +18,11 @@ public sealed class FolderProbeScannerTests
             new FakeFfprobeService(),
             classifier);
 
-        var results = await scanner.ScanAsync(@"C:\videos");
+        var summary = await scanner.ScanAsync(@"C:\videos");
 
-        results.ShouldBeEmpty();
+        summary.FilesDiscovered.ShouldBe(0);
+        summary.CandidateCount.ShouldBe(0);
+        summary.ProbeFailureCount.ShouldBe(0);
     }
 
     [Fact]
@@ -30,16 +32,16 @@ public sealed class FolderProbeScannerTests
         var file = temp.File("candidate.mp4");
         var service = new FakeFfprobeService
         {
-            Results =
-            {
-                [file] = Success(file, bpp: 0.20)
-            }
+            Results = { [file] = Success(file, bpp: 0.20) }
         };
+        var received = new List<ProbeResult>();
 
-        var results = await CreateScanner(service).ScanAsync(temp.Path);
+        var summary = await CreateScanner(service).ScanAsync(
+            temp.Path,
+            progress: new InlineProgress<ProbeResult>(received.Add));
 
-        results.Single().Classification.ShouldNotBeNull();
-        results.Single().Classification!.Outcome.ShouldBe(ClassificationOutcome.Candidate);
+        received.ShouldHaveSingleItem().Classification!.Outcome.ShouldBe(ClassificationOutcome.Candidate);
+        summary.CandidateCount.ShouldBe(1);
     }
 
     [Fact]
@@ -56,12 +58,18 @@ public sealed class FolderProbeScannerTests
                 [good] = Success(good, bpp: 0.20)
             }
         };
+        var received = new List<ProbeResult>();
 
-        var results = await CreateScanner(service).ScanAsync(temp.Path);
+        var summary = await CreateScanner(service).ScanAsync(
+            temp.Path,
+            progress: new InlineProgress<ProbeResult>(received.Add));
 
-        results.Count.ShouldBe(2);
-        results[0].Failure.ShouldNotBeNull();
-        results[1].Classification!.Outcome.ShouldBe(ClassificationOutcome.Candidate);
+        received.Count.ShouldBe(2);
+        received.ShouldContain(r => r.Failure != null);
+        received.ShouldContain(r => r.Classification != null && r.Classification.Outcome == ClassificationOutcome.Candidate);
+        summary.FilesDiscovered.ShouldBe(2);
+        summary.CandidateCount.ShouldBe(1);
+        summary.ProbeFailureCount.ShouldBe(1);
     }
 
     [Fact]
@@ -88,47 +96,39 @@ public sealed class FolderProbeScannerTests
     }
 
     [Fact]
-    public async Task ScanAsync_PreservesSortedDiscoveryOrder()
+    public async Task ScanAsync_ReturnsCorrectFilesDiscoveredCount()
     {
         using var temp = new TempDirectory();
-        var second = temp.File("z.mp4");
-        var first = temp.File("a.mp4");
+        var a = temp.File("a.mp4");
+        var b = temp.File("b.mp4");
         var service = new FakeFfprobeService
         {
             Results =
             {
-                [first] = Success(first, bpp: 0.20),
-                [second] = Success(second, bpp: 0.20)
+                [a] = Success(a, bpp: 0.20),
+                [b] = Success(b, bpp: 0.20)
             }
         };
 
-        var results = await CreateScanner(service).ScanAsync(temp.Path);
+        var summary = await CreateScanner(service).ScanAsync(temp.Path);
 
-        results.Select(result => Path.GetFileName(result.FilePath)).ShouldBe(new[] { "a.mp4", "z.mp4" });
+        summary.FilesDiscovered.ShouldBe(2);
     }
 
     [Fact]
-    public async Task ScanAsync_HonorsCancellationBeforeRemainingFiles()
+    public async Task ScanAsync_HonorsCancellation()
     {
         using var temp = new TempDirectory();
-        var first = temp.File("a.mp4");
-        temp.File("b.mp4");
+        temp.File("a.mp4");
         using var cts = new CancellationTokenSource();
-        var service = new FakeFfprobeService
-        {
-            Results =
-            {
-                [first] = Success(first, bpp: 0.20)
-            },
-            CancelAfterFirstProbe = cts
-        };
+        cts.Cancel();
 
         await Should.ThrowAsync<OperationCanceledException>(() =>
-            CreateScanner(service).ScanAsync(temp.Path, cancellationToken: cts.Token));
+            CreateScanner(new FakeFfprobeService()).ScanAsync(temp.Path, cancellationToken: cts.Token));
     }
 
-    private static FolderProbeScanner CreateScanner(IFfprobeService service) =>
-        new(new VideoFileDiscovery(), service, new BppClassifier());
+    private static FolderProbeScanner CreateScanner(IFfprobeService service, int maxParallelism = 2) =>
+        new(new VideoFileDiscovery(), service, new BppClassifier(), maxParallelism);
 
     private static ProbeResult Success(string filePath, double bpp) =>
         new()
@@ -161,19 +161,11 @@ public sealed class FolderProbeScannerTests
 
     private sealed class FakeFfprobeService : IFfprobeService
     {
-        private int _probeCount;
         public Dictionary<string, ProbeResult> Results { get; } = new(StringComparer.OrdinalIgnoreCase);
-        public CancellationTokenSource? CancelAfterFirstProbe { get; init; }
 
         public Task<ProbeResult> ProbeAsync(string filePath, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            _probeCount++;
-            if (_probeCount == 1)
-            {
-                CancelAfterFirstProbe?.Cancel();
-            }
-
             return Task.FromResult(Results[filePath]);
         }
     }
@@ -190,8 +182,7 @@ public sealed class FolderProbeScannerTests
             TriageOptions? options = null,
             bool recursive = false,
             IProgress<DiscoveryWarning>? warnings = null,
-            CancellationToken cancellationToken = default) =>
-            [];
+            CancellationToken cancellationToken = default) => [];
     }
 
     private sealed class StubVideoClassifier : IVideoClassifier
@@ -223,9 +214,7 @@ public sealed class FolderProbeScannerTests
         public void Dispose()
         {
             if (Directory.Exists(Path))
-            {
                 Directory.Delete(Path, recursive: true);
-            }
         }
     }
 }

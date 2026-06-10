@@ -41,24 +41,23 @@ Console.WriteLine($"Recursive: {recursive}");
 Console.WriteLine();
 
 var options = new TriageOptions();
-var results = await scanner.ScanAsync(folderPath, options, recursive);
 
-foreach (var result in results)
+var progress = new Progress<ProbeResult>(result =>
 {
     if (result.Failure is not null)
     {
         Console.WriteLine($"INVALID\t{result.FilePath}\t{result.Failure.Message}");
-        continue;
+        return;
     }
 
     var classification = result.Classification!;
     var stats = result.Stats!;
     Console.WriteLine(
         $"{classification.Outcome}\t{stats.BitsPerPixel:0.000}\t{stats.CodecName}\t{stats.Width}x{stats.Height}\t{result.FilePath}");
-}
+});
 
-var candidates = results.Count(result => result.Classification?.Outcome == ClassificationOutcome.Candidate);
+var summary = await scanner.ScanAsync(folderPath, options, recursive, progress);
 Console.WriteLine();
-Console.WriteLine($"Scanned: {results.Count}");
-Console.WriteLine($"Candidates: {candidates}");
+Console.WriteLine($"Scanned: {summary.FilesDiscovered}");
+Console.WriteLine($"Candidates: {summary.CandidateCount}");
 return 0;
