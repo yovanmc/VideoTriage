@@ -11,6 +11,20 @@ public sealed record DonutSlice(double StartAngle, double SweepAngle, string Col
 
 public sealed class DonutChart : FrameworkElement
 {
+    private static readonly Dictionary<string, Brush> _brushCache = new();
+    private static readonly BrushConverter _brushConverter = new();
+
+    private static Brush GetBrush(string color)
+    {
+        if (!_brushCache.TryGetValue(color, out var brush))
+        {
+            brush = (Brush)_brushConverter.ConvertFromString(color)!;
+            brush.Freeze();
+            _brushCache[color] = brush;
+        }
+        return brush;
+    }
+
     public static readonly DependencyProperty ItemsSourceProperty =
         DependencyProperty.Register(
             nameof(ItemsSource),
@@ -55,10 +69,9 @@ public sealed class DonutChart : FrameworkElement
 
         foreach (var slice in BuildSlices(ItemsSource))
         {
-            var brush = (Brush)new BrushConverter().ConvertFromString(slice.Color)!;
             drawingContext.DrawGeometry(
                 null,
-                new Pen(brush, thickness)
+                new Pen(GetBrush(slice.Color), thickness)
                 {
                     StartLineCap = PenLineCap.Flat,
                     EndLineCap = PenLineCap.Flat

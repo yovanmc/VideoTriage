@@ -188,7 +188,12 @@ public sealed class MainViewModel : ObservableObject
 
         SelectedFolder = folder;
         IsScanning = true;
-        _dispatcher.Post(Items.Clear);
+        _dispatcher.Post(() =>
+        {
+            foreach (var row in Items)
+                row.Thumbnail = null;
+            Items.Clear();
+        });
 
         _scanCts = new CancellationTokenSource();
 

@@ -135,6 +135,40 @@ public sealed class MainViewModelScanTests
         scanner.LastRecursive.ShouldBe(false);
     }
 
+    [Fact]
+    public async Task ChooseFolderAsync_500Candidates_AddsAllToItems()
+    {
+        var scanner = new FakeFolderProbeScanner();
+        for (var i = 0; i < 500; i++)
+            scanner.Results.Add(Result($@"C:\videos\file{i:D4}.mp4"));
+        var vm = Create(
+            scanner,
+            new FakeDialogService { Result = @"C:\videos" });
+
+        await vm.ChooseFolderAsync();
+
+        vm.Items.Count.ShouldBe(500);
+    }
+
+    [Fact]
+    public async Task ChooseFolderAsync_SecondScan_ClearsItemsFromFirstScan()
+    {
+        var scanner = new FakeFolderProbeScanner();
+        for (var i = 0; i < 10; i++)
+            scanner.Results.Add(Result($@"C:\videos\file{i}.mp4"));
+        var vm = Create(
+            scanner,
+            new FakeDialogService { Result = @"C:\videos" });
+
+        await vm.ChooseFolderAsync();
+        vm.Items.Count.ShouldBe(10);
+
+        scanner.Results.Clear();
+        await vm.ChooseFolderAsync();
+
+        vm.Items.ShouldBeEmpty();
+    }
+
     private static MainViewModel Create(
         FakeFolderProbeScanner scanner,
         FakeDialogService dialog,
