@@ -3,11 +3,15 @@ using Microsoft.Win32;
 
 namespace VideoTriage.App.Services;
 
-public sealed class ExplorerLauncher : IExplorerLauncher
+public sealed class ExplorerLauncher(
+    Func<ProcessStartInfo, Process?>? processStarter = null) : IExplorerLauncher
 {
+    private readonly Func<ProcessStartInfo, Process?> _start =
+        processStarter ?? Process.Start;
+
     public void Open(string path)
     {
-        using var process = Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        using var process = _start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
 }
 
