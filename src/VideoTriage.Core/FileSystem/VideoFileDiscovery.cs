@@ -2,18 +2,25 @@ using VideoTriage.Core.Models;
 
 namespace VideoTriage.Core.FileSystem;
 
-public interface IDirectoryWalker
+internal interface IDirectoryWalker
 {
     bool DirectoryExists(string path);
     IEnumerable<string> GetFiles(string directory);
     IEnumerable<DirectoryEntry> GetDirectories(string directory);
 }
 
-public sealed record DirectoryEntry(string Path, FileAttributes Attributes);
+internal sealed record DirectoryEntry(string Path, FileAttributes Attributes);
 
-public sealed class VideoFileDiscovery(IDirectoryWalker? walker = null) : IVideoFileDiscovery
+public sealed class VideoFileDiscovery : IVideoFileDiscovery
 {
-    private readonly IDirectoryWalker _walker = walker ?? new PhysicalDirectoryWalker();
+    private readonly IDirectoryWalker _walker;
+
+    public VideoFileDiscovery() : this(new PhysicalDirectoryWalker()) { }
+
+    internal VideoFileDiscovery(IDirectoryWalker walker)
+    {
+        _walker = walker;
+    }
 
     public IEnumerable<string> EnumerateVideos(
         string folderPath,
@@ -32,8 +39,12 @@ public sealed class VideoFileDiscovery(IDirectoryWalker? walker = null) : IVideo
 
         bool IsSafe(string file)
         {
-            var full = Path.GetFullPath(file);
-            return full.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase);
+            try
+            {
+                var full = Path.GetFullPath(file);
+                return full.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception) { return false; }
         }
 
         bool IsVideo(string file) =>
@@ -56,16 +67,16 @@ public sealed class VideoFileDiscovery(IDirectoryWalker? walker = null) : IVideo
         {
             cancellationToken.ThrowIfCancellationRequested();
             var dir = stack.Pop();
-
-            foreach (var file in _walker.GetFiles(dir))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (IsVideo(file) && IsSafe(file))
-                    yield return Path.GetFullPath(file);
-            }
+            var safeFiles = new List<string>();
 
             try
             {
+                foreach (var file in _walker.GetFiles(dir))
+                {
+                    if (IsVideo(file) && IsSafe(file))
+                        safeFiles.Add(Path.GetFullPath(file));
+                }
+
                 foreach (var entry in _walker.GetDirectories(dir))
                 {
                     if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
@@ -73,6 +84,7 @@ public sealed class VideoFileDiscovery(IDirectoryWalker? walker = null) : IVideo
                     stack.Push(entry.Path);
                 }
             }
+            catch (OperationCanceledException) { throw; }
             catch (UnauthorizedAccessException ex)
             {
                 warnings?.Report(new DiscoveryWarning { DirectoryPath = dir, Exception = ex });
@@ -80,6 +92,12 @@ public sealed class VideoFileDiscovery(IDirectoryWalker? walker = null) : IVideo
             catch (IOException ex)
             {
                 warnings?.Report(new DiscoveryWarning { DirectoryPath = dir, Exception = ex });
+            }
+
+            foreach (var file in safeFiles)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return file;
             }
         }
     }

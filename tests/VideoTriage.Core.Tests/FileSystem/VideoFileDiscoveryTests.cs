@@ -132,24 +132,24 @@ public sealed class VideoFileDiscoveryTests
 
     private sealed class FakeDirectoryWalker : IDirectoryWalker
     {
-        public List<string> RootFiles { get; } = [];
+        public Dictionary<string, List<string>> FilesByDirectory { get; } =
+            new(StringComparer.OrdinalIgnoreCase);
         public List<DirectoryEntry> Children { get; } = [];
-        public Dictionary<string, Exception> Exceptions { get; } = new(StringComparer.OrdinalIgnoreCase);
-        public Dictionary<string, List<string>> FilesByDirectory { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, Exception> Exceptions { get; } =
+            new(StringComparer.OrdinalIgnoreCase);
 
         public bool DirectoryExists(string path) => true;
 
         public IEnumerable<string> GetFiles(string directory)
         {
-            if (FilesByDirectory.TryGetValue(directory, out var dirFiles))
-                return dirFiles;
-            return RootFiles;
+            if (FilesByDirectory.TryGetValue(directory, out var files))
+                return files;
+            return []; // empty for unmapped dirs (simulates empty directory)
         }
 
         public IEnumerable<DirectoryEntry> GetDirectories(string directory)
         {
-            if (Exceptions.TryGetValue(directory, out var ex))
-                throw ex;
+            if (Exceptions.TryGetValue(directory, out var ex)) throw ex;
             return Children;
         }
     }
