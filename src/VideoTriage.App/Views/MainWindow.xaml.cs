@@ -27,6 +27,19 @@ public partial class MainWindow : FluentWindow
         try
         {
             await _workLifetime.StopAsync(TimeSpan.FromSeconds(10));
+        }
+        catch (TimeoutException)
+        {
+            System.Windows.MessageBox.Show(
+                "A video process did not stop within 10 seconds. The application will close. " +
+                "You may need to end 'ffmpeg.exe' or 'HandBrakeCLI.exe' manually.",
+                "VideoTriage",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Warning);
+        }
+
+        try
+        {
             await _viewModel.CancelAndWaitAsync();
         }
         finally

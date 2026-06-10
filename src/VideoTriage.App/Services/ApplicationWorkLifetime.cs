@@ -30,12 +30,13 @@ public sealed class ApplicationWorkLifetime : IApplicationWorkLifetime
             ctsToCancel = _cts;
         }
 
-        ctsToCancel?.Cancel();
+        try { ctsToCancel?.Cancel(); }
+        catch (ObjectDisposedException) { /* CTS was already disposed by the completing task */ }
         if (taskToWait is { IsCompleted: false })
         {
             try { await taskToWait.WaitAsync(timeout); }
-            catch (TimeoutException) { /* log if needed; process is exiting */ }
             catch (OperationCanceledException) { }
+            // TimeoutException is not caught here — it propagates to the caller
         }
     }
 }

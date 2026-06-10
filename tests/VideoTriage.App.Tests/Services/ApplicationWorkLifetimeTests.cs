@@ -50,13 +50,13 @@ public sealed class ApplicationWorkLifetimeTests
     }
 
     [Fact]
-    public async Task Track_AfterCompletedTask_Succeeds()
+    public void Track_AfterCompletedTask_Succeeds()
     {
         var lifetime = new ApplicationWorkLifetime();
         var cts1 = new CancellationTokenSource();
         lifetime.Track(Task.CompletedTask, cts1);
 
-        await Task.Delay(10); // ensure task is completed
+        // No delay needed — Task.CompletedTask is already complete
 
         var cts2 = new CancellationTokenSource();
         Should.NotThrow(() => lifetime.Track(Task.CompletedTask, cts2));

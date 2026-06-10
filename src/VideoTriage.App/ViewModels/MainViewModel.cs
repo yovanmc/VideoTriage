@@ -390,7 +390,14 @@ public sealed class MainViewModel : ObservableObject
         lock (_thumbnailLock)
             pending = [.. _thumbnailTasks];
         if (pending.Length > 0)
-            await Task.WhenAll(pending).WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+        {
+            try
+            {
+                await Task.WhenAll(pending).WaitAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+            }
+            catch (TimeoutException) { /* thumbnail tasks didn't drain; process is exiting */ }
+            catch (OperationCanceledException) { }
+        }
     }
 
     private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
