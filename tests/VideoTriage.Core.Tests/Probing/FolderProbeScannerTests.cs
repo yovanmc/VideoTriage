@@ -35,10 +35,11 @@ public sealed class FolderProbeScannerTests
             Results = { [file] = Success(file, bpp: 0.20) }
         };
         var received = new List<ProbeResult>();
+        var receivedLock = new object();
 
         var summary = await CreateScanner(service).ScanAsync(
             temp.Path,
-            progress: new InlineProgress<ProbeResult>(received.Add));
+            progress: new InlineProgress<ProbeResult>(r => { lock (receivedLock) received.Add(r); }));
 
         received.ShouldHaveSingleItem().Classification!.Outcome.ShouldBe(ClassificationOutcome.Candidate);
         summary.CandidateCount.ShouldBe(1);
@@ -59,10 +60,11 @@ public sealed class FolderProbeScannerTests
             }
         };
         var received = new List<ProbeResult>();
+        var receivedLock = new object();
 
         var summary = await CreateScanner(service).ScanAsync(
             temp.Path,
-            progress: new InlineProgress<ProbeResult>(received.Add));
+            progress: new InlineProgress<ProbeResult>(r => { lock (receivedLock) received.Add(r); }));
 
         received.Count.ShouldBe(2);
         received.ShouldContain(r => r.Failure != null);
@@ -87,10 +89,11 @@ public sealed class FolderProbeScannerTests
             }
         };
         var progressResults = new List<ProbeResult>();
+        var progressResultsLock = new object();
 
         await CreateScanner(service).ScanAsync(
             temp.Path,
-            progress: new InlineProgress<ProbeResult>(progressResults.Add));
+            progress: new InlineProgress<ProbeResult>(r => { lock (progressResultsLock) progressResults.Add(r); }));
 
         progressResults.Count.ShouldBe(2);
     }
