@@ -71,6 +71,8 @@ public static class ServiceCollectionExtensions
                 return new NullThumbnailService();
             return new FfmpegThumbnailService(ffmpegPath, sp.GetRequiredService<IProcessRunner>());
         });
+        services.AddSingleton<ApplicationWorkLifetime>();
+        services.AddSingleton<IApplicationWorkLifetime>(sp => sp.GetRequiredService<ApplicationWorkLifetime>());
         services.AddSingleton<IRunLeaseFactory, FileRunLeaseFactory>();
         services.AddSingleton<IFileSystem, PhysicalFileSystem>();
         services.AddSingleton<IVideoFileDiscovery, VideoFileDiscovery>();
@@ -164,7 +166,8 @@ public static class ServiceCollectionExtensions
                 userErrors: sp.GetRequiredService<IUserErrorSink>(),
                 diagnostics: sp.GetRequiredService<DiagnosticsViewModel>(),
                 activeRunJournalFactory: sp.GetRequiredService<Func<string, IActiveRunJournal>>(),
-                thumbnailService: sp.GetRequiredService<IThumbnailService>());
+                thumbnailService: sp.GetRequiredService<IThumbnailService>(),
+                workLifetime: sp.GetRequiredService<IApplicationWorkLifetime>());
         });
         services.AddSingleton<MainWindow>();
 

@@ -22,6 +22,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly IUserErrorSink? _userErrors;
     private readonly Func<string, IActiveRunJournal>? _activeRunJournalFactory;
     private readonly IThumbnailService? _thumbnailService;
+    private readonly IApplicationWorkLifetime? _workLifetime;
     private CancellationTokenSource? _runCts;
     private CancellationTokenSource? _scanCts;
     private PauseToken? _pauseToken;
@@ -47,7 +48,8 @@ public sealed class MainViewModel : ObservableObject
         IUserErrorSink? userErrors = null,
         DiagnosticsViewModel? diagnostics = null,
         Func<string, IActiveRunJournal>? activeRunJournalFactory = null,
-        IThumbnailService? thumbnailService = null)
+        IThumbnailService? thumbnailService = null,
+        IApplicationWorkLifetime? workLifetime = null)
     {
         _scanner = scanner;
         _dialogService = dialogService;
@@ -57,6 +59,7 @@ public sealed class MainViewModel : ObservableObject
         _userErrors = userErrors;
         _activeRunJournalFactory = activeRunJournalFactory;
         _thumbnailService = thumbnailService;
+        _workLifetime = workLifetime;
         Settings = settings;
         Diagnostics = diagnostics;
         _optionsFactory = optionsFactory
@@ -241,13 +244,17 @@ public sealed class MainViewModel : ObservableObject
                 ?? throw new InvalidOperationException("Required video tools are unavailable.");
             var options = _optionsFactory();
 
-            var summary = await pipeline.RunAsync(
+            var runTask = pipeline.RunAsync(
                 SelectedFolder!,
                 options,
                 recursive: Settings?.Recursive ?? true,
                 progress,
                 _pauseToken,
                 _runCts.Token);
+
+            _workLifetime?.Track(runTask, _runCts);
+
+            var summary = await runTask;
             _lastRunDataDirectory = options.DryRun
                 ? null
                 : Path.Combine(SelectedFolder!, options.DataDirectoryName);
