@@ -244,13 +244,18 @@ public sealed class MainViewModelRunTests
 
     private sealed class NoopFolderProbeScanner : IFolderProbeScanner
     {
-        public Task<IReadOnlyList<ProbeResult>> ScanAsync(
+        public Task<FolderScanSummary> ScanAsync(
             string folderPath,
             TriageOptions? options = null,
             bool recursive = false,
             IProgress<ProbeResult>? progress = null,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<ProbeResult>>([]);
+            Task.FromResult(new FolderScanSummary
+            {
+                FilesDiscovered = 0,
+                CandidateCount = 0,
+                ProbeFailureCount = 0,
+            });
     }
 
     private sealed class AvailablePrerequisiteService : IPrerequisiteService

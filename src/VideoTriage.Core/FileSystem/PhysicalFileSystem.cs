@@ -3,6 +3,15 @@ namespace VideoTriage.Core.FileSystem;
 /// <summary>Real filesystem adapter. Thin pass-through to <see cref="File"/>/<see cref="Directory"/>/<see cref="DriveInfo"/>.</summary>
 public sealed class PhysicalFileSystem : IFileSystem
 {
+    private readonly IDiskSpaceProvider _diskSpace;
+
+    public PhysicalFileSystem() : this(new WindowsDiskSpaceProvider()) { }
+
+    public PhysicalFileSystem(IDiskSpaceProvider diskSpace)
+    {
+        _diskSpace = diskSpace ?? throw new ArgumentNullException(nameof(diskSpace));
+    }
+
     public bool FileExists(string path) => File.Exists(path);
 
     public long GetFileLength(string path) => new FileInfo(path).Length;
@@ -17,12 +26,7 @@ public sealed class PhysicalFileSystem : IFileSystem
 
     public void DeleteFile(string path) => File.Delete(path);
 
-    public long GetAvailableFreeSpace(string path)
-    {
-        var root = Path.GetPathRoot(Path.GetFullPath(path))
-            ?? throw new ArgumentException($"Cannot resolve drive root for path: {path}", nameof(path));
-        return new DriveInfo(root).AvailableFreeSpace;
-    }
+    public long GetAvailableFreeSpace(string path) => _diskSpace.GetAvailableFreeSpace(path);
 
     public DateTimeOffset GetLastWriteTimeUtc(string path) =>
         new(File.GetLastWriteTimeUtc(path), TimeSpan.Zero);

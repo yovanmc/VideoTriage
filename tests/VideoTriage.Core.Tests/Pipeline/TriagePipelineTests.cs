@@ -278,7 +278,12 @@ public sealed class TriagePipelineTests
 
         private sealed class FakeDiscovery(PipelineFakes f) : IVideoFileDiscovery
         {
-            public IReadOnlyList<string> FindVideos(string folderPath, TriageOptions? options = null, bool recursive = false)
+            public IEnumerable<string> EnumerateVideos(
+                string folderPath,
+                TriageOptions? options = null,
+                bool recursive = false,
+                IProgress<DiscoveryWarning>? warnings = null,
+                CancellationToken cancellationToken = default)
             {
                 f.Calls.Add("discover");
                 return f.TwoFileMode ? [FilePath, SecondFilePath] : [FilePath];
