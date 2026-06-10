@@ -140,6 +140,29 @@ public sealed class FfmpegThumbnailServiceTests
         }
     }
 
+    [Fact]
+    public async Task GetAsync_VideoStream_DoesNotMapStream()
+    {
+        // Arrange: a fake runner that records args and returns success (no output file → null result)
+        ProcessRequest? captured = null;
+        var runner = new FakeProcessRunner
+        {
+            OnRun = req =>
+            {
+                captured = req;
+                return Ok();
+            }
+        };
+        var svc = new FfmpegThumbnailService("ffmpeg", runner, () => Path.Combine(Path.GetTempPath(), $"vt_thumb_{Guid.NewGuid():N}.png"));
+
+        // Act (result will be null because no file is written — that's fine)
+        _ = await svc.GetAsync(@"C:\video.mp4", streamIndex: -1, CancellationToken.None);
+
+        // Assert
+        captured.ShouldNotBeNull();
+        captured!.Arguments.ShouldNotContain("-map");
+    }
+
     // STA thread helper for BitmapImage which requires STA
     private static async Task<T> OnStaAsync<T>(Func<Task<T>> fn)
     {

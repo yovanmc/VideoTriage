@@ -31,10 +31,14 @@ public sealed class FfmpegThumbnailService : IThumbnailService, IDisposable
             var pngPath = _tempFileFactory();
             try
             {
+                var arguments = streamIndex >= 0
+                    ? new[] { "-i", filePath, "-map", $"0:{streamIndex}", "-frames:v", "1", "-loglevel", "quiet", pngPath, "-y" }
+                    : new[] { "-i", filePath, "-frames:v", "1", "-loglevel", "quiet", pngPath, "-y" };
+
                 await _runner.RunAsync(new ProcessRequest
                 {
                     FileName = _ffmpegPath,
-                    Arguments = ["-i", filePath, "-map", $"0:{streamIndex}", "-frames:v", "1", "-loglevel", "quiet", pngPath, "-y"],
+                    Arguments = arguments,
                     Timeout = TimeSpan.FromSeconds(30)
                 }, cancellationToken);
 
