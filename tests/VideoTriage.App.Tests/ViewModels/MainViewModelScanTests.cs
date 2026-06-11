@@ -102,6 +102,23 @@ public sealed class MainViewModelScanTests
     }
 
     [Fact]
+    public async Task AfterScan_QueueRemainingCount_EqualsCandidateRows()
+    {
+        // Regression (bug 1c): the queue count must equal the number of candidate
+        // rows actually added — not be set before the last row lands.
+        var scanner = new FakeFolderProbeScanner();
+        scanner.Results.Add(Result(@"C:\videos\a.mp4"));
+        scanner.Results.Add(Result(@"C:\videos\b.mp4"));
+        scanner.Results.Add(Result(@"C:\videos\c.mp4"));
+        var vm = Create(scanner, new FakeDialogService { Result = @"C:\videos" });
+
+        await vm.ChooseFolderAsync();
+
+        vm.QueueRemainingCount.ShouldBe(vm.Items.Count);
+        vm.Items.Count.ShouldBe(3);
+    }
+
+    [Fact]
     public async Task ChooseFolderAsync_DefaultSettings_PassesRecursiveTrueToScanner()
     {
         var scanner = new FakeFolderProbeScanner();
