@@ -1,12 +1,11 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using VideoTriage.App.Models;
 using VideoTriage.App.Services;
 using VideoTriage.Core.Models;
 
 namespace VideoTriage.App.ViewModels;
 
-public sealed class SettingsViewModel : ObservableObject
+public sealed class SettingsViewModel : ObservableObject, System.ComponentModel.INotifyDataErrorInfo
 {
     private readonly ISettingsStore _store;
     private double _candidateBppThreshold;
@@ -29,11 +28,10 @@ public sealed class SettingsViewModel : ObservableObject
         _minimumFreeGigabytes = settings.MinimumFreeGigabytes;
         _dryRun = settings.DryRun;
         _recursive = settings.Recursive;
-        SaveCommand = new RelayCommand(Save, () => CanSave);
+        Validate();
     }
 
     public IReadOnlyList<DeleteMode> DeleteModes { get; } = Enum.GetValues<DeleteMode>();
-    public IRelayCommand SaveCommand { get; }
 
     public double CandidateBppThreshold
     {
@@ -102,7 +100,35 @@ public sealed class SettingsViewModel : ObservableObject
 
     public TriageOptions ToTriageOptions() => CurrentSettings().ToTriageOptions();
 
-    private void Save() => _store.Save(CurrentSettings());
+    private readonly Dictionary<string, string> _errors = new();
+
+    public event EventHandler<System.ComponentModel.DataErrorsChangedEventArgs>? ErrorsChanged;
+    public bool HasErrors => _errors.Count > 0;
+    public System.Collections.IEnumerable GetErrors(string? propertyName) =>
+        propertyName is not null && _errors.TryGetValue(propertyName, out var e)
+            ? new[] { e } : Array.Empty<string>();
+
+    private void SetError(string property, string? message)
+    {
+        var had = _errors.ContainsKey(property);
+        if (message is null)
+        {
+            if (had) { _errors.Remove(property); ErrorsChanged?.Invoke(this, new(property)); }
+        }
+        else if (!had || _errors[property] != message)
+        {
+            _errors[property] = message;
+            ErrorsChanged?.Invoke(this, new(property));
+        }
+    }
+
+    private void Validate()
+    {
+        SetError(nameof(CandidateBppThreshold),
+            CandidateBppThreshold is <= 0 or > 1 ? "Must be greater than 0 and at most 1." : null);
+        SetError(nameof(MinimumFreeGigabytes),
+            MinimumFreeGigabytes < 1 ? "Must be at least 1 GB." : null);
+    }
 
     private AppSettings CurrentSettings() => new()
     {
@@ -120,9 +146,10 @@ public sealed class SettingsViewModel : ObservableObject
         if (!SetProperty(ref field, value, propertyName))
             return;
 
+        Validate();
         OnPropertyChanged(nameof(ValidationMessage));
         OnPropertyChanged(nameof(CanSave));
         OnPropertyChanged(nameof(CanRun));
-        SaveCommand.NotifyCanExecuteChanged();
+        if (CanSave) _store.Save(CurrentSettings());
     }
 }
