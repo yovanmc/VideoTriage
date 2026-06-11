@@ -267,8 +267,8 @@ public sealed class MainViewModel : ObservableObject
 
             var runTask = pipeline.RunAsync(
                 SelectedFolder!,
+                Items.Select(r => r.FilePath).ToList(),
                 options,
-                recursive: Settings?.Recursive ?? true,
                 progress,
                 _pauseToken,
                 _runCts.Token);

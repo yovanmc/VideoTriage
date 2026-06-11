@@ -100,18 +100,16 @@ public sealed class MainViewModelRunTests
     }
 
     [Fact]
-    public async Task StartAsync_PassesRecursiveFalse_ToPipeline()
+    public async Task StartAsync_PassesQueueFilePaths_ToPipeline()
     {
         var pipeline = new CapturingTriagePipeline();
-        var stubStore = new StubSettingsStore(new AppSettings { Recursive = false });
-        var settings = new SettingsViewModel(stubStore);
-        var vm = MakeViewModel(pipeline, settings: settings);
+        var vm = MakeViewModel(pipeline);
         vm.SelectedFolder = @"C:\Videos";
         vm.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
 
         await vm.StartCommand.ExecuteAsync(null);
 
-        pipeline.CapturedRecursive.ShouldBe(false);
+        pipeline.CapturedFilePaths.ShouldBe([@"C:\Videos\clip.mp4"]);
     }
 
     [Fact]
@@ -277,18 +275,18 @@ public sealed class MainViewModelRunTests
     private sealed class CapturingTriagePipeline : ITriagePipeline
     {
         public TriageOptions? Options { get; private set; }
-        public bool? CapturedRecursive { get; private set; }
+        public IReadOnlyList<string>? CapturedFilePaths { get; private set; }
 
         public Task<TriageSummary> RunAsync(
             string folder,
+            IReadOnlyList<string> filePaths,
             TriageOptions options,
-            bool recursive = false,
             IProgress<FileProgress>? progress = null,
             PauseToken? pauseToken = null,
             CancellationToken cancellationToken = default)
         {
             Options = options;
-            CapturedRecursive = recursive;
+            CapturedFilePaths = filePaths;
             return Task.FromResult(FakeTriagePipeline.EmptySummary());
         }
     }

@@ -17,10 +17,10 @@ public sealed class TriagePipelineTests
     {
         var fakes = PipelineFakes.LowBpp();
 
-        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineFakes.FilePath], new TriageOptions());
 
         result.Skipped.ShouldBe(1);
-        fakes.Calls.ShouldBe(["discover", "probe", "classify"]);
+        fakes.Calls.ShouldBe(["probe", "classify"]);
         fakes.OriginalRemoved.ShouldBeFalse();
     }
 
@@ -30,10 +30,10 @@ public sealed class TriagePipelineTests
         var fakes = PipelineFakes.Candidate();
         fakes.ProbeSucceeds = false;
 
-        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineFakes.FilePath], new TriageOptions());
 
         result.Invalid.ShouldBe(1);
-        fakes.Calls.ShouldBe(["discover", "probe"]);
+        fakes.Calls.ShouldBe(["probe"]);
     }
 
     [Fact]
@@ -41,10 +41,10 @@ public sealed class TriagePipelineTests
     {
         var fakes = PipelineFakes.Candidate();
 
-        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions { DryRun = true });
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineFakes.FilePath], new TriageOptions { DryRun = true });
 
         result.Skipped.ShouldBe(1);
-        fakes.Calls.ShouldBe(["discover", "probe", "classify"]);
+        fakes.Calls.ShouldBe(["probe", "classify"]);
         fakes.OriginalRemoved.ShouldBeFalse();
     }
 
@@ -54,7 +54,7 @@ public sealed class TriagePipelineTests
         var fakes = PipelineFakes.Candidate();
         fakes.AvailableBytes = 10;
 
-        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineFakes.FilePath], new TriageOptions());
 
         result.Failed.ShouldBe(1);
         fakes.Calls.ShouldNotContain("replace");
@@ -67,10 +67,10 @@ public sealed class TriagePipelineTests
         var fakes = PipelineFakes.Candidate();
         fakes.EncodeOutcome = EncodeOutcome.Failed;
 
-        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineFakes.FilePath], new TriageOptions());
 
         result.Failed.ShouldBe(1);
-        fakes.Calls.ShouldBe(["discover", "probe", "classify", "space", "encode"]);
+        fakes.Calls.ShouldBe(["probe", "classify", "space", "encode"]);
         fakes.OriginalRemoved.ShouldBeFalse();
     }
 
@@ -84,10 +84,10 @@ public sealed class TriagePipelineTests
             Reason = "corrupt"
         };
 
-        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineFakes.FilePath], new TriageOptions());
 
         result.Invalid.ShouldBe(1);
-        fakes.Calls.ShouldBe(["discover", "probe", "classify", "space", "encode", "verify", "delete-temp"]);
+        fakes.Calls.ShouldBe(["probe", "classify", "space", "encode", "verify", "delete-temp"]);
         fakes.OriginalRemoved.ShouldBeFalse();
     }
 
@@ -97,10 +97,10 @@ public sealed class TriagePipelineTests
         var fakes = PipelineFakes.Candidate();
         fakes.OutputBytes = 1000; // equal to source => not smaller
 
-        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineFakes.FilePath], new TriageOptions());
 
         result.Grew.ShouldBe(1);
-        fakes.Calls.ShouldBe(["discover", "probe", "classify", "space", "encode", "verify", "delete-temp"]);
+        fakes.Calls.ShouldBe(["probe", "classify", "space", "encode", "verify", "delete-temp"]);
         fakes.OriginalRemoved.ShouldBeFalse();
     }
 
@@ -109,10 +109,10 @@ public sealed class TriagePipelineTests
     {
         var fakes = PipelineFakes.Candidate();
 
-        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineFakes.FilePath], new TriageOptions());
 
         result.Replaced.ShouldBe(1);
-        fakes.Calls.ShouldBe(["discover", "probe", "classify", "space", "encode", "verify", "replace"]);
+        fakes.Calls.ShouldBe(["probe", "classify", "space", "encode", "verify", "replace"]);
         fakes.OriginalRemoved.ShouldBeTrue();
         // C3: savings must be computed, never left at defaults. Source 1000, output 500 => 500 bytes, 50%.
         result.BytesSaved.ShouldBe(500);
@@ -127,7 +127,7 @@ public sealed class TriagePipelineTests
         var fakes = PipelineFakes.Candidate();
         fakes.OutputBytes = 950; // 5% saving, below the default 10% MarginalThresholdPercent
 
-        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineFakes.FilePath], new TriageOptions());
 
         result.Replaced.ShouldBe(1);
         result.Marginal.ShouldBe(1);
@@ -139,7 +139,7 @@ public sealed class TriagePipelineTests
         var fakes = PipelineFakes.Candidate();
         fakes.ReplaceOutcome = ReplaceOutcome.ReplacePartial;
 
-        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineFakes.FilePath], new TriageOptions());
 
         result.Replaced.ShouldBe(1);
         result.BytesSaved.ShouldBe(500);
@@ -151,12 +151,12 @@ public sealed class TriagePipelineTests
         var fakes = PipelineFakes.Candidate();
         fakes.ReplaceOutcome = ReplaceOutcome.Failed;
 
-        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineFakes.FilePath], new TriageOptions());
 
         result.Failed.ShouldBe(1);
         result.Replaced.ShouldBe(0);
         fakes.Calls.ShouldBe(
-            ["discover", "probe", "classify", "space", "encode", "verify", "replace", "delete-temp"]);
+            ["probe", "classify", "space", "encode", "verify", "replace", "delete-temp"]);
         fakes.OriginalRemoved.ShouldBeFalse();
     }
 
@@ -168,7 +168,7 @@ public sealed class TriagePipelineTests
         fakes.OnEncode = () => cts.Cancel();
 
         await Should.ThrowAsync<OperationCanceledException>(
-            () => fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions(), cancellationToken: cts.Token));
+            () => fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineFakes.FilePath], new TriageOptions(), cancellationToken: cts.Token));
 
         fakes.OriginalRemoved.ShouldBeFalse();
         fakes.Calls.ShouldContain("delete-temp"); // encode temp cleaned up
@@ -181,7 +181,7 @@ public sealed class TriagePipelineTests
         var fakes = PipelineFakes.TwoFiles();
         fakes.ThrowOnFirstEncode = new IOException("No space left on device");
 
-        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineFakes.FilePath, PipelineFakes.SecondFilePath], new TriageOptions());
 
         // First file recorded as EncodeFailed, second file was processed and replaced.
         result.Failed.ShouldBe(1);
@@ -199,7 +199,7 @@ public sealed class TriagePipelineTests
         var fakes = PipelineFakes.TwoFiles();
         fakes.FailFirstReplace = true;
 
-        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineFakes.FilePath, PipelineFakes.SecondFilePath], new TriageOptions());
 
         // First file recorded as ReplaceFailed, second file was processed and replaced.
         result.Failed.ShouldBe(1);
@@ -230,7 +230,6 @@ public sealed class TriagePipelineTests
         public bool OriginalRemoved { get; private set; }
 
         // Multi-file support
-        public bool TwoFileMode { get; set; }
         /// <summary>If set, the encoder throws this exception on the first encode call.</summary>
         public IOException? ThrowOnFirstEncode { get; set; }
         /// <summary>If true, the replacer returns Failed for the first file only.</summary>
@@ -244,7 +243,6 @@ public sealed class TriagePipelineTests
         {
             Pipeline = new TriagePipeline(
                 new FakeRunLeaseFactory(),
-                new FakeDiscovery(this),
                 new FakeProbe(this),
                 new FakeClassifier(this),
                 new FakeEncoder(this),
@@ -258,7 +256,7 @@ public sealed class TriagePipelineTests
 
         public static PipelineFakes Candidate() => new();
         public static PipelineFakes LowBpp() => new() { Classification = ClassificationOutcome.SkipLowBpp };
-        public static PipelineFakes TwoFiles() => new() { TwoFileMode = true };
+        public static PipelineFakes TwoFiles() => new();
 
         internal void MarkOriginalRemoved() => OriginalRemoved = true;
         internal int IncrementEncodeCalls() => ++_encodeCalls;
@@ -275,20 +273,6 @@ public sealed class TriagePipelineTests
             FileSizeBytes = SourceBytes,
             HasAudio = true
         };
-
-        private sealed class FakeDiscovery(PipelineFakes f) : IVideoFileDiscovery
-        {
-            public IEnumerable<string> EnumerateVideos(
-                string folderPath,
-                TriageOptions? options = null,
-                bool recursive = false,
-                IProgress<DiscoveryWarning>? warnings = null,
-                CancellationToken cancellationToken = default)
-            {
-                f.Calls.Add("discover");
-                return f.TwoFileMode ? [FilePath, SecondFilePath] : [FilePath];
-            }
-        }
 
         private sealed class FakeProbe(PipelineFakes f) : IFfprobeService
         {

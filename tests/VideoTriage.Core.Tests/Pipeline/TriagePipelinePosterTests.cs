@@ -18,7 +18,7 @@ public sealed class TriagePipelinePosterTests
     {
         var fakes = PipelinePosterFakes.Successful(embedderReturns: "with-poster.mp4");
 
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions { EmbedPoster = true });
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [@"C:\Videos\clip.mov"], new TriageOptions { EmbedPoster = true });
 
         fakes.Calls.ShouldBe(
         [
@@ -35,7 +35,7 @@ public sealed class TriagePipelinePosterTests
     {
         var fakes = PipelinePosterFakes.Successful(embedderReturns: "with-poster.mp4");
 
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions { EmbedPoster = false });
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [@"C:\Videos\clip.mov"], new TriageOptions { EmbedPoster = false });
 
         fakes.Calls.ShouldBe(["encode", "verify", $"replace:{fakes.EncodePath}"]);
     }
@@ -45,7 +45,7 @@ public sealed class TriagePipelinePosterTests
     {
         var fakes = PipelinePosterFakes.Successful(embedderReturns: null);
 
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions { EmbedPoster = true });
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [@"C:\Videos\clip.mov"], new TriageOptions { EmbedPoster = true });
 
         fakes.Calls.ShouldContain($"replace:{fakes.EncodePath}");
     }
@@ -56,7 +56,7 @@ public sealed class TriagePipelinePosterTests
         var fakes = PipelinePosterFakes.Successful(embedderReturns: "with-poster.mp4");
         fakes.SetFileLength("with-poster.mp4", fakes.SourceBytes + 1);
 
-        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions { EmbedPoster = true });
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", [@"C:\Videos\clip.mov"], new TriageOptions { EmbedPoster = true });
 
         result.Grew.ShouldBe(1);
         fakes.OriginalRemoved.ShouldBeFalse();
@@ -69,7 +69,7 @@ public sealed class TriagePipelinePosterTests
         var fakes = PipelinePosterFakes.Successful(embedderReturns: "with-poster.mp4");
         fakes.ReplaceOutcome = ReplaceOutcome.Failed;
 
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions { EmbedPoster = true });
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [@"C:\Videos\clip.mov"], new TriageOptions { EmbedPoster = true });
 
         fakes.OriginalRemoved.ShouldBeFalse();
         fakes.Calls.ShouldContain($"delete:{fakes.EncodePath}");
@@ -96,7 +96,6 @@ public sealed class TriagePipelinePosterTests
             _embedderReturns = embedderReturns;
             Pipeline = new TriagePipeline(
                 new FakeRunLeaseFactory(),
-                new FakeDiscovery(),
                 new FakeProbe(this),
                 new FakeClassifier(),
                 new FakeEncoder(this),
@@ -130,17 +129,6 @@ public sealed class TriagePipelinePosterTests
             if (string.Equals(path, FilePath, StringComparison.OrdinalIgnoreCase))
                 return SourceBytes;
             return _lengths.TryGetValue(path, out var length) ? length : OutputBytes;
-        }
-
-        private sealed class FakeDiscovery : IVideoFileDiscovery
-        {
-            public IEnumerable<string> EnumerateVideos(
-                string folderPath,
-                TriageOptions? options = null,
-                bool recursive = false,
-                IProgress<DiscoveryWarning>? warnings = null,
-                CancellationToken cancellationToken = default) =>
-                [FilePath];
         }
 
         private sealed class FakeProbe(PipelinePosterFakes f) : IFfprobeService
