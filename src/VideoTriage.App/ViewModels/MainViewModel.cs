@@ -35,6 +35,9 @@ public sealed class MainViewModel : ObservableObject
     private string? _statusMessage;
     private int _queueRemainingCount;
     private string? _interruptedRunNotice;
+    private int _completedInRun;
+    private int _totalInRun;
+    private string? _runProgressText;
     private readonly HashSet<Task> _thumbnailTasks = [];
     private readonly object _thumbnailLock = new();
     private readonly Dictionary<string, FileItemViewModel> _queueIndex =
@@ -194,6 +197,14 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _interruptedRunNotice, value);
     }
 
+    public string? RunProgressText
+    {
+        get => _runProgressText;
+        private set => SetProperty(ref _runProgressText, value);
+    }
+
+    private void UpdateRunProgress() => RunProgressText = $"{_completedInRun} of {_totalInRun}";
+
     public string? StartBlockedReason
     {
         get
@@ -314,6 +325,10 @@ public sealed class MainViewModel : ObservableObject
         LastSummary = null;
         StatusMessage = null;
         QueueRemainingCount = Items.Count;
+        _totalInRun = Items.Count;
+        _completedInRun = 0;
+        RunProgressText = null;
+        UpdateRunProgress();
         OpenDataDirectoryCommand.NotifyCanExecuteChanged();
         RunState = RunState.Running;
         try
@@ -385,7 +400,11 @@ public sealed class MainViewModel : ObservableObject
             Items.Move(i, Items.Count - 1);
 
         if (fp.Phase == TriagePhase.Done)
+        {
             QueueRemainingCount = Math.Max(0, QueueRemainingCount - 1);
+            _completedInRun++;
+            UpdateRunProgress();
+        }
     }
 
     private void PostLatest(FileProgress fp)

@@ -270,6 +270,20 @@ public sealed class MainViewModelRunTests
         scanner.ScanCount.ShouldBeGreaterThan(before);
     }
 
+    [Fact]
+    public async Task RunProgressText_ShowsCompletedOfTotal()
+    {
+        var vm = MakeViewModel(new FakeTriagePipeline(
+        [
+            new FileProgress { FilePath = @"C:\Videos\clip.mp4", Phase = TriagePhase.Done, Outcome = TriageOutcome.Replaced },
+        ]));
+        vm.SelectedFolder = @"C:\Videos";
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\clip2.mp4"));
+        await vm.StartCommand.ExecuteAsync(null);
+        vm.RunProgressText.ShouldContain("of 2");
+    }
+
     private static MainViewModel MakeViewModel(
         ITriagePipeline? pipeline,
         IUiDispatcher? dispatcher = null,
