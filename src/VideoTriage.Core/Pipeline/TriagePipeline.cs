@@ -39,6 +39,8 @@ public sealed class TriagePipeline(
         PauseToken? pauseToken = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(folder);
+        ArgumentNullException.ThrowIfNull(filePaths);
         ArgumentNullException.ThrowIfNull(options);
 
         var results = new List<FileProgress>();

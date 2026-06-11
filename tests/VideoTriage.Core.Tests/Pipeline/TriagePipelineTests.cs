@@ -210,6 +210,22 @@ public sealed class TriagePipelineTests
         replacedFile.FilePath.ShouldBe(PipelineFakes.SecondFilePath);
     }
 
+    [Fact]
+    public async Task RunAsync_EmptyFileList_ReturnsSummaryWithZeroCounts()
+    {
+        var fakes = PipelineFakes.Candidate();
+
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", [], new TriageOptions());
+
+        result.Scanned.ShouldBe(0);
+        result.Candidates.ShouldBe(0);
+        result.Replaced.ShouldBe(0);
+        result.Failed.ShouldBe(0);
+        result.Skipped.ShouldBe(0);
+        result.BytesSaved.ShouldBe(0);
+        fakes.Calls.ShouldBeEmpty();
+    }
+
     private sealed class PipelineFakes
     {
         internal const string FilePath = @"C:\Videos\clip.mov";
@@ -229,7 +245,6 @@ public sealed class TriagePipelineTests
         public Action? OnEncode { get; set; }
         public bool OriginalRemoved { get; private set; }
 
-        // Multi-file support
         /// <summary>If set, the encoder throws this exception on the first encode call.</summary>
         public IOException? ThrowOnFirstEncode { get; set; }
         /// <summary>If true, the replacer returns Failed for the first file only.</summary>
