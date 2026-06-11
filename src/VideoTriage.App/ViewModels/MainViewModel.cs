@@ -233,7 +233,7 @@ public sealed class MainViewModel : ObservableObject
 
     private async Task ScanFolderAsync(string folder)
     {
-        if (_scanner is null)
+        if (_scanner is null || IsScanning)
             return;
 
         // Cancel previous scan's thumbnails and wait for them to drain

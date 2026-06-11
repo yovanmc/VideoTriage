@@ -82,7 +82,7 @@ public sealed class SummaryViewModelTests
         var row = vm.Files.Single();
         row.OldSizeText.ShouldNotBeNullOrEmpty();
         row.NewSizeText.ShouldNotBeNullOrEmpty();
-        row.SavedText.ShouldContain("50");
+        row.SavedText!.ShouldContain("50");
         row.StatusLabel.ShouldBe("Replaced");
     }
 
