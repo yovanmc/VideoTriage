@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using VideoTriage.App.ViewModels;
 
 namespace VideoTriage.App.Controls;
@@ -40,6 +41,37 @@ public sealed class DonutChart : FrameworkElement
         set => SetValue(ItemsSourceProperty, value);
     }
 
+    // Drives the sweep-in reveal: each slice's start and sweep angle is scaled by this value
+    // so the ring grows clockwise from nothing to full. Defaults to 1.0 (fully drawn) so the
+    // chart still renders correctly if the animation never runs (e.g. in tests).
+    public static readonly DependencyProperty AnimatedProgressProperty =
+        DependencyProperty.Register(
+            nameof(AnimatedProgress),
+            typeof(double),
+            typeof(DonutChart),
+            new FrameworkPropertyMetadata(
+                1.0,
+                FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public double AnimatedProgress
+    {
+        get => (double)GetValue(AnimatedProgressProperty);
+        set => SetValue(AnimatedProgressProperty, value);
+    }
+
+    public DonutChart()
+    {
+        Loaded += (_, _) =>
+        {
+            BeginAnimation(
+                AnimatedProgressProperty,
+                new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(450))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                });
+        };
+    }
+
     public static IReadOnlyList<DonutSlice> BuildSlices(
         IReadOnlyList<SummarySegment> segments)
     {
@@ -66,9 +98,14 @@ public sealed class DonutChart : FrameworkElement
         var center = new Point(ActualWidth / 2, ActualHeight / 2);
         var radius = Math.Max(0, Math.Min(ActualWidth, ActualHeight) / 2 - 4);
         var thickness = Math.Max(8, radius * 0.28);
+        var progress = Math.Clamp(AnimatedProgress, 0, 1);
 
         foreach (var slice in BuildSlices(ItemsSource))
         {
+            var sweep = slice.SweepAngle * progress;
+            if (sweep <= 0)
+                continue;
+
             drawingContext.DrawGeometry(
                 null,
                 new Pen(GetBrush(slice.Color), thickness)
@@ -76,7 +113,7 @@ public sealed class DonutChart : FrameworkElement
                     StartLineCap = PenLineCap.Flat,
                     EndLineCap = PenLineCap.Flat
                 },
-                Arc(center, radius - thickness / 2, slice.StartAngle, slice.SweepAngle));
+                Arc(center, radius - thickness / 2, slice.StartAngle * progress, sweep));
         }
     }
 

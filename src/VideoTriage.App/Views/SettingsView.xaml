@@ -2,7 +2,8 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <StackPanel>
-        <TextBlock Text="Settings" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
+        <!-- Matches the uppercase caption rhythm of the other sidebar section headers. -->
+        <TextBlock Text="SETTINGS" FontSize="11" FontWeight="SemiBold" Opacity="0.85" Foreground="{DynamicResource AccentBrush}" />
 
         <TextBlock Margin="0,10,0,4" Text="Candidate BPP threshold" />
         <TextBox Text="{Binding CandidateBppThreshold, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
