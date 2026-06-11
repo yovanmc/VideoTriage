@@ -7,7 +7,10 @@
             <ResourceDictionary.MergedDictionaries>
                 <ui:ThemesDictionary Theme="Dark" />
                 <ui:ControlsDictionary />
+                <!-- Shared design tokens (color/surface/radius/spacing/type). -->
+                <ResourceDictionary Source="/VideoTriage.App;component/Resources/DesignTokens.xaml" />
             </ResourceDictionary.MergedDictionaries>
+
             <!-- Dim all ui:Button instances when disabled -->
             <Style TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
                 <Style.Triggers>

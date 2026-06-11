@@ -1,0 +1,73 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- ============================================================
+         DESIGN TOKENS — the single source of truth for color, surface,
+         radius, spacing and type. Merged into App.xaml and into each
+         view so every view parses self-contained (no reliance on a
+         running Application). Keep in sync with TriageOutcomeDisplay.cs,
+         which must emit the same semantic hex values.
+         ============================================================ -->
+
+    <!-- Semantic colors (one per meaning) -->
+    <Color x:Key="AccentColor">#5CC8FF</Color>
+    <Color x:Key="SuccessColor">#36C98F</Color>
+    <Color x:Key="WarningColor">#F5A524</Color>
+    <Color x:Key="DangerColor">#F05252</Color>
+    <Color x:Key="NeutralColor">#8B93A7</Color>
+
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}" />
+    <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" />
+    <SolidColorBrush x:Key="NeutralBrush" Color="{StaticResource NeutralColor}" />
+
+    <!-- Faint semantic tints (~20% alpha) for banners/status fills -->
+    <SolidColorBrush x:Key="SuccessTintBrush" Color="#3336C98F" />
+    <SolidColorBrush x:Key="WarningTintBrush" Color="#33F5A524" />
+
+    <!-- Surface tokens: stroke, subtle fill, thumbnail placeholder -->
+    <SolidColorBrush x:Key="DividerBrush" Color="#22000000" />
+    <SolidColorBrush x:Key="SubtleFillBrush" Color="#0F7F7F7F" />
+    <SolidColorBrush x:Key="ThumbPlaceholderBrush" Color="#247F7F7F" />
+
+    <!-- Corner radii: cards vs. controls/chips -->
+    <CornerRadius x:Key="CardRadius">8</CornerRadius>
+    <CornerRadius x:Key="ControlRadius">4</CornerRadius>
+
+    <!-- Spacing scale (4px base) for the repeated layout roles -->
+    <Thickness x:Key="SectionGap">0,24,0,8</Thickness>
+    <Thickness x:Key="FieldLabelMargin">0,12,0,4</Thickness>
+
+    <!-- Typography ramp -->
+    <Style x:Key="SectionHeader" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+        <Setter Property="Opacity" Value="0.85" />
+    </Style>
+    <Style x:Key="StatValue" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="24" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style x:Key="Caption" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Opacity" Value="0.6" />
+    </Style>
+
+    <!-- Thumbnail image: shared fade-in. Opacity defaults to 1 so a
+         thumbnail is never stuck hidden if TargetUpdated doesn't fire;
+         the From=0 animation only adds a fade when a source arrives. -->
+    <Style x:Key="ThumbnailImage" TargetType="Image">
+        <Setter Property="Stretch" Value="Uniform" />
+        <Style.Triggers>
+            <EventTrigger RoutedEvent="Binding.TargetUpdated">
+                <BeginStoryboard>
+                    <Storyboard>
+                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                         From="0" To="1" Duration="0:0:0.25" />
+                    </Storyboard>
+                </BeginStoryboard>
+            </EventTrigger>
+        </Style.Triggers>
+    </Style>
+</ResourceDictionary>

@@ -13,25 +13,18 @@
                  WindowBackdropType="Mica"
                  WindowStartupLocation="CenterScreen">
     <ui:FluentWindow.Resources>
-        <SolidColorBrush x:Key="AccentBrush" Color="#5CC8FF" />
-        <SolidColorBrush x:Key="SuccessBrush" Color="#5AD17F" />
-        <SolidColorBrush x:Key="WarningBrush" Color="#E8C35A" />
-        <SolidColorBrush x:Key="DangerBrush" Color="#FF6B6B" />
-
-        <conv:RunStateToVisibility x:Key="RunStateToVisibility" />
-        <conv:NotNullToVisibility x:Key="NotNullToVisibility" />
-        <conv:NullToVisibility x:Key="NullToVisibility" />
-        <conv:BoolToVisibility x:Key="BoolToVisibility" />
-        <conv:RunFailedToVisibility x:Key="RunFailedToVisibility" />
-
-        <!-- Uppercase caption style shared by every sidebar section header, for a
-             consistent typographic rhythm down the left rail. -->
-        <Style x:Key="SectionHeader" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="11" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
-            <Setter Property="Opacity" Value="0.85" />
-        </Style>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- Color/surface/radius/spacing/type tokens; merged per-view so
+                     the window parses self-contained (no running App required). -->
+                <ResourceDictionary Source="/VideoTriage.App;component/Resources/DesignTokens.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <conv:RunStateToVisibility x:Key="RunStateToVisibility" />
+            <conv:NotNullToVisibility x:Key="NotNullToVisibility" />
+            <conv:NullToVisibility x:Key="NullToVisibility" />
+            <conv:BoolToVisibility x:Key="BoolToVisibility" />
+            <conv:RunFailedToVisibility x:Key="RunFailedToVisibility" />
+        </ResourceDictionary>
     </ui:FluentWindow.Resources>
 
     <Grid>
@@ -52,7 +45,7 @@
 
             <Border Grid.Column="0"
                     Padding="16"
-                    BorderBrush="#22000000"
+                    BorderBrush="{StaticResource DividerBrush}"
                     BorderThickness="0,0,1,0">
                 <ScrollViewer VerticalScrollBarVisibility="Hidden">
                 <StackPanel>
@@ -64,10 +57,10 @@
                     <Button Content="Choose folder"
                             Command="{Binding ChooseFolderCommand}" />
 
-                    <TextBlock Margin="0,24,0,4" Text="PRESET" Style="{StaticResource SectionHeader}" />
+                    <TextBlock Margin="{StaticResource SectionGap}" Text="PRESET" Style="{StaticResource SectionHeader}" />
                     <TextBlock Text="VideoTriage AV1 · read-only scan" Opacity="0.7" TextWrapping="Wrap" />
 
-                    <TextBlock Margin="0,24,0,8"
+                    <TextBlock Margin="{StaticResource SectionGap}"
                                Text="PREREQUISITES"
                                Style="{StaticResource SectionHeader}" />
                     <ItemsControl ItemsSource="{Binding Prerequisites}">
@@ -101,7 +94,6 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <Separator Margin="0,20,0,16" />
                     <views:SettingsView DataContext="{Binding Settings}" />
                 </StackPanel>
                 </ScrollViewer>
@@ -115,7 +107,7 @@
 
                 <Border Grid.Row="0"
                         Padding="16,10"
-                        BorderBrush="#22000000"
+                        BorderBrush="{StaticResource DividerBrush}"
                         BorderThickness="0,0,0,1">
                     <StackPanel Orientation="Horizontal">
                         <Button x:Name="StartButton"
@@ -172,7 +164,7 @@
                 </Grid.RowDefinitions>
 
                 <Border Grid.Row="0"
-                        Background="#33E8C35A" CornerRadius="6" Padding="12,8" Margin="16,16,16,0"
+                        Background="{StaticResource WarningTintBrush}" CornerRadius="{StaticResource CardRadius}" Padding="12,8" Margin="16,16,16,0"
                         Visibility="{Binding InterruptedRunNotice, Converter={StaticResource NotNullToVisibility}}">
                     <DockPanel>
                         <Button DockPanel.Dock="Right" Content="Dismiss" Command="{Binding DismissInterruptedNoticeCommand}" />
@@ -187,6 +179,9 @@
                 <ListBox
                          Margin="16"
                          ItemsSource="{Binding Items}"
+                         VirtualizingStackPanel.IsVirtualizing="True"
+                         VirtualizingStackPanel.VirtualizationMode="Recycling"
+                         ScrollViewer.CanContentScroll="True"
                          BorderThickness="0"
                          Background="Transparent">
                     <ListBox.Style>
@@ -205,8 +200,8 @@
                         <DataTemplate>
                             <Border Margin="0,0,0,10"
                                     Padding="12"
-                                    CornerRadius="8"
-                                    Background="#0F7F7F7F">
+                                    CornerRadius="{StaticResource CardRadius}"
+                                    Background="{StaticResource SubtleFillBrush}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="96" />
@@ -215,25 +210,12 @@
                                     </Grid.ColumnDefinitions>
                                     <Border Width="96"
                                             Height="56"
-                                            CornerRadius="4"
+                                            CornerRadius="{StaticResource ControlRadius}"
                                             ClipToBounds="True"
-                                            Background="#247F7F7F">
-                                        <!-- Opacity defaults to 1 (visible) so a thumbnail is never stuck
-                                             hidden if TargetUpdated doesn't fire; the From=0 animation only
-                                             adds a fade when a new source actually arrives. -->
-                                        <Image Source="{Binding Thumbnail, Mode=OneWay, NotifyOnTargetUpdated=True}" Stretch="Uniform"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center">
-                                            <Image.Triggers>
-                                                <EventTrigger RoutedEvent="Binding.TargetUpdated">
-                                                    <BeginStoryboard>
-                                                        <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                             From="0" To="1" Duration="0:0:0.25" />
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </EventTrigger>
-                                            </Image.Triggers>
-                                        </Image>
+                                            Background="{StaticResource ThumbPlaceholderBrush}">
+                                        <Image Source="{Binding Thumbnail, Mode=OneWay, NotifyOnTargetUpdated=True}"
+                                               Style="{StaticResource ThumbnailImage}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
                                     </Border>
                                     <StackPanel Grid.Column="1" Margin="14,0">
                                         <TextBlock Text="{Binding FileName}"
@@ -318,7 +300,7 @@
 
         <Border Grid.Row="2"
                 Padding="18,0"
-                BorderBrush="#22000000"
+                BorderBrush="{StaticResource DividerBrush}"
                 BorderThickness="0,1,0,0">
             <!-- Local, unfrozen brush so the status-bar tint can ColorAnimate between
                  severities instead of snapping. -->
@@ -333,7 +315,7 @@
                                 <BeginStoryboard>
                                     <Storyboard>
                                         <ColorAnimation Storyboard.TargetProperty="Background.Color"
-                                                        To="#335AD17F" Duration="0:0:0.3" />
+                                                        To="#3336C98F" Duration="0:0:0.3" />
                                     </Storyboard>
                                 </BeginStoryboard>
                             </DataTrigger.EnterActions>
@@ -351,7 +333,7 @@
                                 <BeginStoryboard>
                                     <Storyboard>
                                         <ColorAnimation Storyboard.TargetProperty="Background.Color"
-                                                        To="#33E8C35A" Duration="0:0:0.3" />
+                                                        To="#33F5A524" Duration="0:0:0.3" />
                                     </Storyboard>
                                 </BeginStoryboard>
                             </DataTrigger.EnterActions>
@@ -371,7 +353,7 @@
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Border BorderBrush="#735CC8FF"
                             BorderThickness="1"
-                            CornerRadius="4"
+                            CornerRadius="{StaticResource ControlRadius}"
                             Padding="8,2">
                         <TextBlock Text="{Binding QueueRemainingCount, StringFormat=Queue: {0} files}" />
                     </Border>
