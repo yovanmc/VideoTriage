@@ -85,12 +85,15 @@ public sealed class MainViewModel : ObservableObject
         {
             if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
                 _queueIndex.Clear();
-            if (e.NewItems is not null)
-                foreach (FileItemViewModel row in e.NewItems)
-                    _queueIndex[row.FilePath] = row;
+            // Process removals BEFORE additions: a Move (and Replace) raises CollectionChanged
+            // with the SAME row in both OldItems and NewItems. Add-then-remove would net-remove
+            // the row from the index, dropping its later progress updates and its summary thumbnail.
             if (e.OldItems is not null)
                 foreach (FileItemViewModel row in e.OldItems)
                     _queueIndex.Remove(row.FilePath);
+            if (e.NewItems is not null)
+                foreach (FileItemViewModel row in e.NewItems)
+                    _queueIndex[row.FilePath] = row;
             StartCommand.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(StartBlockedReason));
             OnPropertyChanged(nameof(QueueSummaryText));
@@ -380,6 +383,46 @@ public sealed class MainViewModel : ObservableObject
             _runCts = null;
             _pauseToken = null;
             NotifyCommandState();
+        }
+    }
+
+    /// <summary>
+    /// Headless automation entry point for the screenshot harness: scans <paramref name="folder"/>
+    /// without the folder picker, optionally runs the pipeline, then writes a completion signal file.
+    /// <paramref name="autoStart"/> triggers the REAL (destructive) pipeline, so the App only enables
+    /// it in DEBUG builds. Not used in normal interactive operation.
+    /// </summary>
+    public async Task RunAutomationAsync(string folder, bool autoStart, string? doneSignalPath)
+    {
+        try
+        {
+            SelectedFolder = folder;
+            await ScanFolderAsync(folder);
+
+            // Let in-flight thumbnail extraction finish so the queue is fully populated before a run.
+            Task[] pending;
+            lock (_thumbnailLock)
+                pending = _thumbnailTasks.ToArray();
+            if (pending.Length > 0)
+                await Task.WhenAll(pending);
+
+            if (autoStart)
+            {
+                // Session-only confirm (never persisted) so CanStart passes under the default
+                // Permanent delete mode. Automation runs against disposable test clips.
+                if (Settings is not null)
+                    Settings.ConfirmPermanentDelete = true;
+                if (CanStart())
+                    await StartAsync();
+            }
+        }
+        finally
+        {
+            if (!string.IsNullOrWhiteSpace(doneSignalPath))
+            {
+                try { File.WriteAllText(doneSignalPath!, DateTimeOffset.UtcNow.ToString("o")); }
+                catch { /* best-effort completion signal */ }
+            }
         }
     }
 
