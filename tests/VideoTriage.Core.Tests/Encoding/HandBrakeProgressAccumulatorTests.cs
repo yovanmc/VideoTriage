@@ -55,4 +55,26 @@ public sealed class HandBrakeProgressAccumulatorTests
             emitted = acc.Append(line) ?? emitted;
         emitted!.Progress.ShouldBe(1.0);
     }
+
+    [Fact]
+    public void Append_CalledConcurrently_DoesNotThrowOrCorrupt()
+    {
+        var acc = new HandBrakeProgressAccumulator();
+        // Two complete one-line objects; feeding many in parallel must never throw
+        // (e.g. StringBuilder index corruption) and any emitted value must be valid.
+        string[] objects =
+        [
+            "Progress: { \"Working\": { \"Progress\": 0.5 } }",
+            "Progress: { \"Working\": { \"Progress\": 0.75 } }",
+        ];
+
+        Parallel.For(0, 2000, i =>
+        {
+            var r = acc.Append(objects[i % objects.Length]);
+            if (r is not null)
+            {
+                r.Progress.ShouldBeInRange(0.0, 1.0);
+            }
+        });
+    }
 }

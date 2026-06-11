@@ -10,6 +10,7 @@ namespace VideoTriage.Core.Encoding;
 public sealed class HandBrakeProgressAccumulator
 {
     private const int MaxBufferedChars = 64 * 1024; // guard against a never-closing object
+    private readonly object _lock = new();
     private readonly StringBuilder _buffer = new();
     private int _depth;
     private bool _capturing;
@@ -19,41 +20,49 @@ public sealed class HandBrakeProgressAccumulator
     {
         if (line is null) return null;
 
-        foreach (var ch in line)
+        // Called concurrently: ProcessRunner drains stdout and stderr on two tasks, and
+        // HandBrakeEncoder wires this same instance to both. Lock to protect _buffer/_depth/_capturing.
+        lock (_lock)
         {
-            if (ch == '{')
+            foreach (var ch in line)
             {
-                _capturing = true;
-                _depth++;
+                // Naive brace-depth counting is sufficient here: HandBrake --json progress objects
+                // contain only short enum/number values and never embed braces inside string values,
+                // so there are no '{'/'}' characters to escape or skip while scanning.
+                if (ch == '{')
+                {
+                    _capturing = true;
+                    _depth++;
+                }
+
+                if (_capturing)
+                    _buffer.Append(ch);
+
+                if (ch == '}' && _capturing)
+                {
+                    _depth--;
+                    if (_depth == 0)
+                    {
+                        var json = _buffer.ToString();
+                        _buffer.Clear();
+                        _capturing = false;
+                        return HandBrakeProgressParser.TryParse(json);
+                    }
+                }
             }
 
             if (_capturing)
-                _buffer.Append(ch);
-
-            if (ch == '}' && _capturing)
             {
-                _depth--;
-                if (_depth == 0)
+                _buffer.Append('\n');
+                if (_buffer.Length > MaxBufferedChars)
                 {
-                    var json = _buffer.ToString();
                     _buffer.Clear();
+                    _depth = 0;
                     _capturing = false;
-                    return HandBrakeProgressParser.TryParse(json);
                 }
             }
-        }
 
-        if (_capturing)
-        {
-            _buffer.Append('\n');
-            if (_buffer.Length > MaxBufferedChars)
-            {
-                _buffer.Clear();
-                _depth = 0;
-                _capturing = false;
-            }
+            return null;
         }
-
-        return null;
     }
 }
