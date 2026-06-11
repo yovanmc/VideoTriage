@@ -1,3 +1,4 @@
+using System.Windows.Media;
 using Shouldly;
 using VideoTriage.App.Models;
 using VideoTriage.App.Services;
@@ -282,6 +283,75 @@ public sealed class MainViewModelRunTests
         vm.Items.Add(new FileItemViewModel(@"C:\Videos\clip2.mp4"));
         await vm.StartCommand.ExecuteAsync(null);
         vm.RunProgressText.ShouldContain("of 2");
+    }
+
+    [Fact]
+    public async Task Summary_KeepsThumbnailForEveryProcessedFile_AfterReorderMoves()
+    {
+        // Regression: the queue reorders rows during a run (float-to-top / sink-to-bottom via
+        // Items.Move). A Move raises CollectionChanged with the row in BOTH OldItems and NewItems;
+        // if the index handler adds-then-removes, moved rows fall out of the queue index and the
+        // summary loses their thumbnails — only the never-moved row keeps one.
+        var paths = new[] { @"C:\v\a.mp4", @"C:\v\b.mp4", @"C:\v\c.mp4" };
+        var vm = MakeViewModel(new ReplacingPipeline(paths));
+        vm.SelectedFolder = @"C:\v";
+        foreach (var p in paths)
+            vm.Items.Add(new FileItemViewModel(p) { Thumbnail = FrozenThumb() });
+
+        await vm.StartCommand.ExecuteAsync(null);
+
+        vm.LastSummary.ShouldNotBeNull();
+        vm.LastSummary!.Files.Count.ShouldBe(3);
+        vm.LastSummary.Files.ShouldAllBe(f => f.Thumbnail != null);
+    }
+
+    private static ImageSource FrozenThumb()
+    {
+        var img = new DrawingImage();
+        img.Freeze();
+        return img;
+    }
+
+    private sealed class ReplacingPipeline(IReadOnlyList<string> paths) : ITriagePipeline
+    {
+        public Task<TriageSummary> RunAsync(
+            string folder,
+            IReadOnlyList<string> filePaths,
+            TriageOptions options,
+            IProgress<FileProgress>? progress = null,
+            PauseToken? pauseToken = null,
+            CancellationToken cancellationToken = default)
+        {
+            var files = new List<FileProgress>();
+            foreach (var p in paths)
+            {
+                var stats = new VideoStats
+                {
+                    FilePath = p, CodecName = "h264", Width = 1920, Height = 1080,
+                    FramesPerSecond = 30, Duration = TimeSpan.FromSeconds(5),
+                    FileSizeBytes = 1000, HasAudio = true
+                };
+                // Encoding (null progress) floats the row; Done sinks it — both raise Move.
+                progress?.Report(new FileProgress { FilePath = p, Phase = TriagePhase.Encoding });
+                var done = new FileProgress
+                {
+                    FilePath = p, Phase = TriagePhase.Done, Outcome = TriageOutcome.Replaced,
+                    Source = stats, OutputBytes = 500, SavedPercent = 50, FinalPath = p
+                };
+                progress?.Report(done);
+                files.Add(done);
+            }
+
+            return Task.FromResult(new TriageSummary
+            {
+                Scanned = paths.Count, Candidates = paths.Count, Replaced = paths.Count,
+                Marginal = 0, Grew = 0, Invalid = 0, Failed = 0, Skipped = 0,
+                BytesSaved = 500 * paths.Count,
+                StartedAtUtc = DateTimeOffset.UtcNow.AddSeconds(-5),
+                CompletedAtUtc = DateTimeOffset.UtcNow,
+                Files = files
+            });
+        }
     }
 
     private static MainViewModel MakeViewModel(

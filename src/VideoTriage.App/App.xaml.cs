@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -22,7 +23,9 @@ public partial class App : Application
 
             _host.StartAsync().GetAwaiter().GetResult();
             _ = _host.Services.GetRequiredService<ITriagePipelineProvider>();
-            _host.Services.GetRequiredService<MainWindow>().Show();
+            var window = _host.Services.GetRequiredService<MainWindow>();
+            window.Show();
+            MaybeStartAutomation(window, e.Args);
         }
         catch (Exception exception)
         {
@@ -43,6 +46,30 @@ public partial class App : Application
             _host = null;
             Shutdown(1);
         }
+    }
+
+    // Headless automation hooks for the screenshot harness. `--folder` (read-only scan) is honored
+    // in all builds; `--autostart` (runs the real pipeline) and `--done-signal` are DEBUG-only so
+    // shipped builds can never auto-run a destructive encode from a command line.
+    private static void MaybeStartAutomation(MainWindow window, string[] args)
+    {
+        var folder = GetArgValue(args, "--folder");
+        if (string.IsNullOrWhiteSpace(folder)) return;
+        if (window.DataContext is not ViewModels.MainViewModel vm) return;
+
+        var autoStart = false;
+        string? doneSignal = null;
+#if DEBUG
+        autoStart = args.Contains("--autostart");
+        doneSignal = GetArgValue(args, "--done-signal");
+#endif
+        _ = window.Dispatcher.InvokeAsync(() => vm.RunAutomationAsync(folder!, autoStart, doneSignal));
+    }
+
+    private static string? GetArgValue(string[] args, string name)
+    {
+        var i = Array.IndexOf(args, name);
+        return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
     }
 
     protected override void OnExit(ExitEventArgs e)
