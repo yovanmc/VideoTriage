@@ -33,6 +33,8 @@ public sealed class FakeTriagePipeline(IReadOnlyList<FileProgress> events) : ITr
         Failed = 0,
         Skipped = 0,
         BytesSaved = 0,
+        StartedAtUtc = DateTimeOffset.UtcNow,
+        CompletedAtUtc = DateTimeOffset.UtcNow,
         Files = []
     };
 }

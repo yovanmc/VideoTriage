@@ -23,6 +23,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly Func<string, IActiveRunJournal>? _activeRunJournalFactory;
     private readonly IThumbnailService? _thumbnailService;
     private readonly IApplicationWorkLifetime? _workLifetime;
+    private readonly IExplorerLauncher? _explorerLauncher;
     private CancellationTokenSource? _runCts;
     private CancellationTokenSource? _scanCts;
     private PauseToken? _pauseToken;
@@ -33,6 +34,10 @@ public sealed class MainViewModel : ObservableObject
     private RunState _runState = RunState.Idle;
     private string? _statusMessage;
     private int _queueRemainingCount;
+    private string? _interruptedRunNotice;
+    private int _completedInRun;
+    private int _totalInRun;
+    private string? _runProgressText;
     private readonly HashSet<Task> _thumbnailTasks = [];
     private readonly object _thumbnailLock = new();
     private readonly Dictionary<string, FileItemViewModel> _queueIndex =
@@ -54,7 +59,8 @@ public sealed class MainViewModel : ObservableObject
         DiagnosticsViewModel? diagnostics = null,
         Func<string, IActiveRunJournal>? activeRunJournalFactory = null,
         IThumbnailService? thumbnailService = null,
-        IApplicationWorkLifetime? workLifetime = null)
+        IApplicationWorkLifetime? workLifetime = null,
+        IExplorerLauncher? explorerLauncher = null)
     {
         _scanner = scanner;
         _dialogService = dialogService;
@@ -65,6 +71,7 @@ public sealed class MainViewModel : ObservableObject
         _activeRunJournalFactory = activeRunJournalFactory;
         _thumbnailService = thumbnailService;
         _workLifetime = workLifetime;
+        _explorerLauncher = explorerLauncher;
         Settings = settings;
         Diagnostics = diagnostics;
         _optionsFactory = optionsFactory
@@ -85,6 +92,8 @@ public sealed class MainViewModel : ObservableObject
                 foreach (FileItemViewModel row in e.OldItems)
                     _queueIndex.Remove(row.FilePath);
             StartCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(StartBlockedReason));
+            OnPropertyChanged(nameof(QueueSummaryText));
         };
         PauseCommand = new RelayCommand(Pause, () => RunState == RunState.Running);
         ResumeCommand = new RelayCommand(Resume, () => RunState == RunState.Paused);
@@ -95,8 +104,15 @@ public sealed class MainViewModel : ObservableObject
             OpenDataDirectory,
             () => _lastRunDataDirectory is not null);
         BackToQueueCommand = new RelayCommand(BackToQueue, () => LastSummary is not null);
+        OpenLogCommand = new RelayCommand(OpenLog);
+        DismissInterruptedNoticeCommand = new RelayCommand(() => InterruptedRunNotice = null);
         if (settings is not null)
-            settings.PropertyChanged += (_, _) => StartCommand.NotifyCanExecuteChanged();
+            settings.PropertyChanged += (_, _) =>
+            {
+                StartCommand.NotifyCanExecuteChanged();
+                OnPropertyChanged(nameof(StartBlockedReason));
+                OnPropertyChanged(nameof(QueueSummaryText));
+            };
     }
 
     public ObservableCollection<FileItemViewModel> Items { get; } = [];
@@ -110,6 +126,8 @@ public sealed class MainViewModel : ObservableObject
     public IRelayCommand StopCommand { get; }
     public IRelayCommand OpenDataDirectoryCommand { get; }
     public IRelayCommand BackToQueueCommand { get; }
+    public IRelayCommand OpenLogCommand { get; }
+    public IRelayCommand DismissInterruptedNoticeCommand { get; }
 
     public string? SelectedFolder
     {
@@ -117,7 +135,11 @@ public sealed class MainViewModel : ObservableObject
         set
         {
             if (SetProperty(ref _selectedFolder, value))
+            {
                 StartCommand.NotifyCanExecuteChanged();
+                OnPropertyChanged(nameof(StartBlockedReason));
+                OnPropertyChanged(nameof(QueueSummaryText));
+            }
         }
     }
 
@@ -169,16 +191,46 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _queueRemainingCount, value);
     }
 
+    public string? InterruptedRunNotice
+    {
+        get => _interruptedRunNotice;
+        private set => SetProperty(ref _interruptedRunNotice, value);
+    }
+
+    public string? RunProgressText
+    {
+        get => _runProgressText;
+        private set => SetProperty(ref _runProgressText, value);
+    }
+
+    private void UpdateRunProgress() => RunProgressText = $"{_completedInRun} of {_totalInRun}";
+
+    public string? StartBlockedReason
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(SelectedFolder)) return "Choose a folder to scan.";
+            if (Items.Count == 0) return "No candidates found in this folder.";
+            if (_pipelineProvider?.Pipeline is null) return "Required video tools are unavailable.";
+            if (Settings is { CanRun: false }) return Settings.ValidationMessage ?? "Fix settings before starting.";
+            return null;
+        }
+    }
+
+    public string QueueSummaryText
+    {
+        get
+        {
+            var count = Items.Count;
+            if (count == 0) return "No candidates";
+            var totalBytes = Items.Sum(i => i.SourceBytes);
+            var noun = count == 1 ? "candidate" : "candidates";
+            return $"{count} {noun} · {VideoTriage.Core.Formatting.HumanSize.Format(totalBytes)}";
+        }
+    }
+
     public async Task ChooseFolderAsync()
     {
-        // Cancel previous scan's thumbnails and wait for them to drain
-        if (_scanCts is not null)
-        {
-            await CancelAndWaitAsync();
-            _scanCts.Dispose();
-            _scanCts = null;
-        }
-
         if (_scanner is null || IsScanning)
             return;
 
@@ -187,6 +239,23 @@ public sealed class MainViewModel : ObservableObject
             return;
 
         SelectedFolder = folder;
+        await ScanFolderAsync(folder);
+    }
+
+    private async Task ScanFolderAsync(string folder)
+    {
+        if (_scanner is null || IsScanning)
+            return;
+
+        // Cancel previous scan's thumbnails and wait for them to drain
+        if (_scanCts is not null)
+        {
+            await CancelAndWaitAsync();
+            _scanCts.Dispose();
+            _scanCts = null;
+        }
+
+        InterruptedRunNotice = null;
         IsScanning = true;
         _dispatcher.Post(() =>
         {
@@ -225,7 +294,7 @@ public sealed class MainViewModel : ObservableObject
                           $" (phase: {activeRun.CurrentPhase}, {activeRun.CompletedFiles}/{activeRun.TotalFiles} completed)." +
                           " The replacement journal contains recovery information.";
                 _appLog?.Information(msg);
-                // TODO: surface in Diagnostics panel (Phase 4)
+                InterruptedRunNotice = msg;
             }
         }
         finally
@@ -256,6 +325,10 @@ public sealed class MainViewModel : ObservableObject
         LastSummary = null;
         StatusMessage = null;
         QueueRemainingCount = Items.Count;
+        _totalInRun = Items.Count;
+        _completedInRun = 0;
+        RunProgressText = null;
+        UpdateRunProgress();
         OpenDataDirectoryCommand.NotifyCanExecuteChanged();
         RunState = RunState.Running;
         try
@@ -279,7 +352,9 @@ public sealed class MainViewModel : ObservableObject
             _lastRunDataDirectory = options.DryRun
                 ? null
                 : Path.Combine(SelectedFolder!, options.DataDirectoryName);
-            LastSummary = new SummaryViewModel(summary);
+            var thumbs = _queueIndex.ToDictionary(
+                kv => kv.Key, kv => kv.Value.Thumbnail, StringComparer.OrdinalIgnoreCase);
+            LastSummary = new SummaryViewModel(summary, thumbs, _explorerLauncher);
         }
         catch (OperationCanceledException)
         {
@@ -296,7 +371,7 @@ public sealed class MainViewModel : ObservableObject
                 $"Review the queue and log before retrying: {_appLog?.CurrentLogPath ?? "log unavailable"}",
                 exception.Message);
             Diagnostics?.Refresh();
-            StatusMessage = "Run failed. See Diagnostics for details.";
+            StatusMessage = "Run failed — see log";
         }
         finally
         {
@@ -325,7 +400,11 @@ public sealed class MainViewModel : ObservableObject
             Items.Move(i, Items.Count - 1);
 
         if (fp.Phase == TriagePhase.Done)
+        {
             QueueRemainingCount = Math.Max(0, QueueRemainingCount - 1);
+            _completedInRun++;
+            UpdateRunProgress();
+        }
     }
 
     private void PostLatest(FileProgress fp)
@@ -379,8 +458,18 @@ public sealed class MainViewModel : ObservableObject
     {
         _lastRunDataDirectory = null;
         LastSummary = null;
-        QueueRemainingCount = Items.Count;
         OpenDataDirectoryCommand.NotifyCanExecuteChanged();
+        if (!string.IsNullOrWhiteSpace(SelectedFolder))
+            _ = ScanFolderAsync(SelectedFolder!);
+        else
+            QueueRemainingCount = Items.Count;
+    }
+
+    private void OpenLog()
+    {
+        var path = _appLog?.CurrentLogPath;
+        if (!string.IsNullOrWhiteSpace(path))
+            _explorerLauncher?.Open(path);
     }
 
     private void NotifyCommandState()

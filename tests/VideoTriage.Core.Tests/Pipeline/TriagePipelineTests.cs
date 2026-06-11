@@ -211,6 +211,18 @@ public sealed class TriagePipelineTests
     }
 
     [Fact]
+    public async Task RunAsync_PopulatesRunTiming()
+    {
+        var fakes = PipelineFakes.Candidate();
+        var before = DateTimeOffset.UtcNow;
+
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineFakes.FilePath], new TriageOptions());
+
+        result.StartedAtUtc.ShouldBeGreaterThanOrEqualTo(before);
+        result.CompletedAtUtc.ShouldBeGreaterThanOrEqualTo(result.StartedAtUtc);
+    }
+
+    [Fact]
     public async Task RunAsync_EmptyFileList_ReturnsSummaryWithZeroCounts()
     {
         var fakes = PipelineFakes.Candidate();

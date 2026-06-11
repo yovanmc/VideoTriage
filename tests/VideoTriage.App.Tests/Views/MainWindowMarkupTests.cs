@@ -4,14 +4,19 @@ namespace VideoTriage.App.Tests.Views;
 
 public sealed class MainWindowMarkupTests
 {
-    [Fact]
-    public void MainWindowMarkup_BindsFolderQueuePrerequisitesAndReservedToolbar()
+    private static string ReadMainWindowXaml()
     {
         var path = Path.GetFullPath(Path.Combine(
             AppContext.BaseDirectory,
             "..", "..", "..", "..", "..",
             "src", "VideoTriage.App", "Views", "MainWindow.xaml"));
-        var xaml = File.ReadAllText(path);
+        return File.ReadAllText(path);
+    }
+
+    [Fact]
+    public void MainWindowMarkup_BindsFolderQueuePrerequisitesAndReservedToolbar()
+    {
+        var xaml = ReadMainWindowXaml();
 
         xaml.ShouldContain("Command=\"{Binding ChooseFolderCommand}\"");
         xaml.ShouldContain("ItemsSource=\"{Binding Items}\"");
@@ -25,5 +30,35 @@ public sealed class MainWindowMarkupTests
         xaml.ShouldContain("Command=\"{Binding ResumeCommand}\"");
         xaml.ShouldContain("Command=\"{Binding StopCommand}\"");
         xaml.ShouldNotContain("sample.mp4");
+    }
+
+    [Fact]
+    public void Toolbar_BindsStartStopPauseResumeBackOpenData()
+    {
+        var xaml = ReadMainWindowXaml();
+        xaml.ShouldContain("{Binding StartCommand}");
+        xaml.ShouldContain("{Binding StopCommand}");
+        xaml.ShouldContain("{Binding BackToQueueCommand}");
+        xaml.ShouldContain("{Binding OpenDataDirectoryCommand}");
+    }
+
+    [Fact]
+    public void Sidebar_HasNoDiagnosticsExpander()
+    {
+        ReadMainWindowXaml().ShouldNotContain("DiagnosticsView");
+    }
+
+    [Fact]
+    public void StatusBar_BindsRunProgressAndQueueSummary()
+    {
+        var xaml = ReadMainWindowXaml();
+        xaml.ShouldContain("RunProgressText");
+        xaml.ShouldContain("QueueSummaryText");
+    }
+
+    [Fact]
+    public void RecoveryBanner_BindsInterruptedNotice()
+    {
+        ReadMainWindowXaml().ShouldContain("InterruptedRunNotice");
     }
 }

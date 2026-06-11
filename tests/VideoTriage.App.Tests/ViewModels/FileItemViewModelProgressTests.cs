@@ -37,10 +37,10 @@ public sealed class FileItemViewModelProgressTests
     }
 
     [Theory]
-    [InlineData(TriageOutcome.OutputInvalid, "Verification failed; original kept")]
-    [InlineData(TriageOutcome.GrewKeptOriginal, "Encode grew; original kept")]
-    [InlineData(TriageOutcome.Cancelled, "Cancelled; original kept")]
-    [InlineData(TriageOutcome.ReplacePartial, "Saved as recoverable partial")]
+    [InlineData(TriageOutcome.OutputInvalid, "Verification failed — kept original")]
+    [InlineData(TriageOutcome.GrewKeptOriginal, "Kept — encode was larger")]
+    [InlineData(TriageOutcome.Cancelled, "Stopped")]
+    [InlineData(TriageOutcome.ReplacePartial, "Replaced (recoverable partial) · saved 0%")]
     public void Apply_TerminalOutcome_ShowsSafetyText(TriageOutcome outcome, string expected)
     {
         var vm = new FileItemViewModel(@"C:\Videos\clip.mp4");
@@ -82,7 +82,7 @@ public sealed class FileItemViewModelProgressTests
             FinalPath = @"C:\Videos\clip.mp4"
         });
 
-        vm.StatusText.ShouldBe("Saved 67.5%");
+        vm.StatusText.ShouldContain("saved 67.5%");
         vm.OldSizeText.ShouldNotBeNullOrEmpty();
         vm.SavedText.ShouldContain("-67.5%");
         vm.FinalPath.ShouldBe(@"C:\Videos\clip.mp4");
@@ -133,6 +133,22 @@ public sealed class FileItemViewModelProgressTests
 
         vm.IsProgressIndeterminate.ShouldBeFalse();
         vm.Progress.ShouldBe(50);
+    }
+
+    [Theory]
+    [InlineData(TriageOutcome.InsufficientSpace)]
+    [InlineData(TriageOutcome.EncodeFailed)]
+    [InlineData(TriageOutcome.OutputInvalid)]
+    public void Apply_Done_UsesOutcomeDisplayLabel(TriageOutcome outcome)
+    {
+        var vm = new FileItemViewModel(@"C:\Videos\clip.mp4");
+        vm.Apply(new FileProgress
+        {
+            FilePath = @"C:\Videos\clip.mp4",
+            Phase = TriagePhase.Done,
+            Outcome = outcome,
+        });
+        vm.StatusText.ShouldBe(TriageOutcomeDisplay.Label(outcome));
     }
 
     [Fact]

@@ -75,6 +75,8 @@ public sealed class FileItemViewModel : ObservableObject
         internal set => SetProperty(ref _thumbnail, value);
     }
 
+    public long SourceBytes { get; private set; }
+
     public void ApplyProbe(ProbeResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
@@ -93,6 +95,7 @@ public sealed class FileItemViewModel : ObservableObject
         }
 
         var stats = result.Stats;
+        SourceBytes = stats.FileSizeBytes;
         MetaLine =
             $"{stats.Width}x{stats.Height} | " +
             $"{stats.FramesPerSecond.ToString("0.##", CultureInfo.InvariantCulture)} fps | " +
@@ -164,15 +167,17 @@ public sealed class FileItemViewModel : ObservableObject
             && !progressEvent.EncodeProgress.HasValue;
     }
 
-    private static string DoneText(FileProgress progressEvent, double? computedSavedPct = null) =>
-        progressEvent.Outcome switch
+    private static string DoneText(FileProgress progressEvent, double? computedSavedPct = null)
+    {
+        if (progressEvent.Outcome is TriageOutcome.Replaced or TriageOutcome.ReplacePartial)
         {
-            TriageOutcome.Replaced =>
-                $"Saved {(computedSavedPct ?? progressEvent.SavedPercent ?? 0).ToString("0.#", CultureInfo.InvariantCulture)}%",
-            TriageOutcome.ReplacePartial => "Saved as recoverable partial",
-            TriageOutcome.OutputInvalid => "Verification failed; original kept",
-            TriageOutcome.GrewKeptOriginal => "Encode grew; original kept",
-            TriageOutcome.Cancelled => "Cancelled; original kept",
-            _ => progressEvent.Message ?? "Done"
-        };
+            var pct = (computedSavedPct ?? progressEvent.SavedPercent ?? 0)
+                .ToString("0.#", CultureInfo.InvariantCulture);
+            return $"{TriageOutcomeDisplay.Label(progressEvent.Outcome)} · saved {pct}%";
+        }
+
+        return progressEvent.Outcome is { } o
+            ? TriageOutcomeDisplay.Label(o)
+            : progressEvent.Message ?? "Done";
+    }
 }

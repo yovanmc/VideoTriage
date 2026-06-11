@@ -5,10 +5,12 @@
         <TextBlock Text="Settings" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" />
 
         <TextBlock Margin="0,10,0,4" Text="Candidate BPP threshold" />
-        <TextBox Text="{Binding CandidateBppThreshold, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBox Text="{Binding CandidateBppThreshold, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+        <TextBlock Text="Allowed range 0–1" Opacity="0.55" FontSize="11" />
 
         <TextBlock Margin="0,10,0,4" Text="Minimum free space (GB)" />
-        <TextBox Text="{Binding MinimumFreeGigabytes, UpdateSourceTrigger=PropertyChanged}" />
+        <TextBox Text="{Binding MinimumFreeGigabytes, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
+        <TextBlock Text="At least 1 GB" Opacity="0.55" FontSize="11" />
 
         <TextBlock Margin="0,10,0,4" Text="Original deletion" />
         <ComboBox ItemsSource="{Binding DeleteModes}"
@@ -48,10 +50,6 @@
                 </Style>
             </TextBlock.Style>
         </TextBlock>
-        <Button Margin="0,8,0,0"
-                Content="Save settings"
-                Command="{Binding SaveCommand}" />
-
         <!-- Recursive toggle deferred to Phase 3 (Queue UX plan) -->
     </StackPanel>
 </UserControl>

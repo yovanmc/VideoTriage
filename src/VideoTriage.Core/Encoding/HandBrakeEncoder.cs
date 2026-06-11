@@ -15,11 +15,12 @@ public sealed class HandBrakeEncoder(
         IProgress<double>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        var accumulator = new HandBrakeProgressAccumulator();
         var outputLines = new InlineProgress<string>(line =>
         {
-            var value = HandBrakeProgressParser.TryParseProgress(line);
-            if (value.HasValue)
-                progress?.Report(value.Value);
+            var update = accumulator.Append(line);
+            if (update is not null)
+                progress?.Report(update.Progress);
         });
 
         try

@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Shouldly;
 using VideoTriage.App.Models;
 using VideoTriage.App.Services;
@@ -20,7 +21,6 @@ public sealed class SettingsViewModelTests
 
         vm.CanSave.ShouldBeFalse();
         vm.ValidationMessage.ShouldNotBeNull().ShouldContain("threshold");
-        vm.SaveCommand.CanExecute(null).ShouldBeFalse();
     }
 
     [Fact]
@@ -63,15 +63,57 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
-    public void SaveCommand_ValidSettings_Persists()
+    public void ValidChange_Persists()
     {
         var store = new FakeSettingsStore();
         var vm = new SettingsViewModel(store) { DryRun = true };
 
-        vm.SaveCommand.Execute(null);
-
         store.Saved.ShouldNotBeNull();
         store.Saved.DryRun.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ValidChange_PersistsImmediately()
+    {
+        var store = new CountingSettingsStore();
+        var vm = new SettingsViewModel(store);
+        var before = store.SaveCount;
+        vm.MinimumFreeGigabytes = 7;
+        store.SaveCount.ShouldBeGreaterThan(before);
+        store.Last!.MinimumFreeGigabytes.ShouldBe(7);
+    }
+
+    [Fact]
+    public void InvalidChange_DoesNotPersist_AndFlagsFieldError()
+    {
+        var store = new CountingSettingsStore();
+        var vm = new SettingsViewModel(store);
+        var before = store.SaveCount;
+        vm.CandidateBppThreshold = 5; // > 1, invalid
+        ((INotifyDataErrorInfo)vm).HasErrors.ShouldBeTrue();
+        ((INotifyDataErrorInfo)vm).GetErrors(nameof(vm.CandidateBppThreshold))
+            .Cast<string>().ShouldNotBeEmpty();
+        store.SaveCount.ShouldBe(before);
+    }
+
+    [Fact]
+    public void ConfirmPermanentDelete_NotPersisted()
+    {
+        var store = new CountingSettingsStore();
+        var vm = new SettingsViewModel(store) { DeleteMode = VideoTriage.Core.Models.DeleteMode.Permanent };
+        vm.ConfirmPermanentDelete = true;
+        // Confirm flag is a session gate; persisted settings never carry it.
+        // (AppSettings has no such field — assert persistence still works without throwing.)
+        vm.MinimumFreeGigabytes = 3;
+        store.Last.ShouldNotBeNull();
+    }
+
+    private sealed class CountingSettingsStore : ISettingsStore
+    {
+        public int SaveCount { get; private set; }
+        public AppSettings? Last { get; private set; }
+        public AppSettings Load() => new();
+        public void Save(AppSettings settings) { SaveCount++; Last = settings; }
     }
 
     private sealed class FakeSettingsStore : ISettingsStore

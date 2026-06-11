@@ -167,7 +167,8 @@ public static class ServiceCollectionExtensions
                 diagnostics: sp.GetRequiredService<DiagnosticsViewModel>(),
                 activeRunJournalFactory: sp.GetRequiredService<Func<string, IActiveRunJournal>>(),
                 thumbnailService: sp.GetRequiredService<IThumbnailService>(),
-                workLifetime: sp.GetRequiredService<IApplicationWorkLifetime>());
+                workLifetime: sp.GetRequiredService<IApplicationWorkLifetime>(),
+                explorerLauncher: sp.GetRequiredService<IExplorerLauncher>());
         });
         services.AddSingleton<MainWindow>();
 
