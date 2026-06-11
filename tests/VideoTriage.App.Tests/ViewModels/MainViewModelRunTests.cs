@@ -247,12 +247,36 @@ public sealed class MainViewModelRunTests
         vm.QueueSummaryText.ShouldContain("1 candidate");
     }
 
+    [Fact]
+    public void DismissInterruptedNotice_WhenNull_DoesNotThrow()
+    {
+        var vm = MakeViewModel(new FakeTriagePipeline([]));
+        vm.InterruptedRunNotice.ShouldBeNull();
+        vm.DismissInterruptedNoticeCommand.Execute(null);
+        vm.InterruptedRunNotice.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task BackToQueue_RescansFolder()
+    {
+        var scanner = new RecordingScanner();
+        var vm = MakeViewModel(new FakeTriagePipeline([]), scanner: scanner);
+        vm.SelectedFolder = @"C:\Videos";
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
+        await vm.StartCommand.ExecuteAsync(null); // sets LastSummary
+        var before = scanner.ScanCount;
+        vm.BackToQueueCommand.Execute(null);
+        await Task.Delay(100);
+        scanner.ScanCount.ShouldBeGreaterThan(before);
+    }
+
     private static MainViewModel MakeViewModel(
         ITriagePipeline? pipeline,
         IUiDispatcher? dispatcher = null,
-        SettingsViewModel? settings = null) =>
+        SettingsViewModel? settings = null,
+        IFolderProbeScanner? scanner = null) =>
         new(
-            scanner: new NoopFolderProbeScanner(),
+            scanner: scanner ?? new NoopFolderProbeScanner(),
             new FakeDialogService(),
             dispatcher ?? new RecordingUiDispatcher(),
             new AvailablePrerequisiteService(),
@@ -263,6 +287,27 @@ public sealed class MainViewModelRunTests
     private sealed class StubPipelineProvider(ITriagePipeline? pipeline) : ITriagePipelineProvider
     {
         public ITriagePipeline? Pipeline { get; } = pipeline;
+    }
+
+    private sealed class RecordingScanner : IFolderProbeScanner
+    {
+        public int ScanCount { get; private set; }
+
+        public Task<FolderScanSummary> ScanAsync(
+            string folderPath,
+            TriageOptions? options = null,
+            bool recursive = false,
+            IProgress<ProbeResult>? progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            ScanCount++;
+            return Task.FromResult(new FolderScanSummary
+            {
+                FilesDiscovered = 0,
+                CandidateCount = 0,
+                ProbeFailureCount = 0,
+            });
+        }
     }
 
     private sealed class NoopFolderProbeScanner : IFolderProbeScanner

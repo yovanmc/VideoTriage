@@ -34,6 +34,7 @@ public sealed class MainViewModel : ObservableObject
     private RunState _runState = RunState.Idle;
     private string? _statusMessage;
     private int _queueRemainingCount;
+    private string? _interruptedRunNotice;
     private readonly HashSet<Task> _thumbnailTasks = [];
     private readonly object _thumbnailLock = new();
     private readonly Dictionary<string, FileItemViewModel> _queueIndex =
@@ -101,6 +102,7 @@ public sealed class MainViewModel : ObservableObject
             () => _lastRunDataDirectory is not null);
         BackToQueueCommand = new RelayCommand(BackToQueue, () => LastSummary is not null);
         OpenLogCommand = new RelayCommand(OpenLog);
+        DismissInterruptedNoticeCommand = new RelayCommand(() => InterruptedRunNotice = null);
         if (settings is not null)
             settings.PropertyChanged += (_, _) =>
             {
@@ -122,6 +124,7 @@ public sealed class MainViewModel : ObservableObject
     public IRelayCommand OpenDataDirectoryCommand { get; }
     public IRelayCommand BackToQueueCommand { get; }
     public IRelayCommand OpenLogCommand { get; }
+    public IRelayCommand DismissInterruptedNoticeCommand { get; }
 
     public string? SelectedFolder
     {
@@ -185,6 +188,12 @@ public sealed class MainViewModel : ObservableObject
         private set => SetProperty(ref _queueRemainingCount, value);
     }
 
+    public string? InterruptedRunNotice
+    {
+        get => _interruptedRunNotice;
+        private set => SetProperty(ref _interruptedRunNotice, value);
+    }
+
     public string? StartBlockedReason
     {
         get
@@ -211,14 +220,6 @@ public sealed class MainViewModel : ObservableObject
 
     public async Task ChooseFolderAsync()
     {
-        // Cancel previous scan's thumbnails and wait for them to drain
-        if (_scanCts is not null)
-        {
-            await CancelAndWaitAsync();
-            _scanCts.Dispose();
-            _scanCts = null;
-        }
-
         if (_scanner is null || IsScanning)
             return;
 
@@ -227,6 +228,23 @@ public sealed class MainViewModel : ObservableObject
             return;
 
         SelectedFolder = folder;
+        await ScanFolderAsync(folder);
+    }
+
+    private async Task ScanFolderAsync(string folder)
+    {
+        if (_scanner is null)
+            return;
+
+        // Cancel previous scan's thumbnails and wait for them to drain
+        if (_scanCts is not null)
+        {
+            await CancelAndWaitAsync();
+            _scanCts.Dispose();
+            _scanCts = null;
+        }
+
+        InterruptedRunNotice = null;
         IsScanning = true;
         _dispatcher.Post(() =>
         {
@@ -265,7 +283,7 @@ public sealed class MainViewModel : ObservableObject
                           $" (phase: {activeRun.CurrentPhase}, {activeRun.CompletedFiles}/{activeRun.TotalFiles} completed)." +
                           " The replacement journal contains recovery information.";
                 _appLog?.Information(msg);
-                // TODO: surface in Diagnostics panel (Phase 4)
+                InterruptedRunNotice = msg;
             }
         }
         finally
@@ -319,7 +337,9 @@ public sealed class MainViewModel : ObservableObject
             _lastRunDataDirectory = options.DryRun
                 ? null
                 : Path.Combine(SelectedFolder!, options.DataDirectoryName);
-            LastSummary = new SummaryViewModel(summary);
+            var thumbs = _queueIndex.ToDictionary(
+                kv => kv.Key, kv => kv.Value.Thumbnail, StringComparer.OrdinalIgnoreCase);
+            LastSummary = new SummaryViewModel(summary, thumbs, _explorerLauncher);
         }
         catch (OperationCanceledException)
         {
@@ -419,8 +439,11 @@ public sealed class MainViewModel : ObservableObject
     {
         _lastRunDataDirectory = null;
         LastSummary = null;
-        QueueRemainingCount = Items.Count;
         OpenDataDirectoryCommand.NotifyCanExecuteChanged();
+        if (!string.IsNullOrWhiteSpace(SelectedFolder))
+            _ = ScanFolderAsync(SelectedFolder!);
+        else
+            QueueRemainingCount = Items.Count;
     }
 
     private void OpenLog()
