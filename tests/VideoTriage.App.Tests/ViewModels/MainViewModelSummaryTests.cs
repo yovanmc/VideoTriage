@@ -106,7 +106,28 @@ public sealed class MainViewModelSummaryTests
         BytesSaved = 500,
         StartedAtUtc = DateTimeOffset.UtcNow,
         CompletedAtUtc = DateTimeOffset.UtcNow,
-        Files = []
+        Files =
+        [
+            new FileProgress
+            {
+                FilePath = @"C:\Videos\clip.mp4",
+                Phase = TriagePhase.Done,
+                Outcome = TriageOutcome.Replaced,
+                Source = new VideoStats
+                {
+                    FilePath = @"C:\Videos\clip.mp4",
+                    CodecName = "h264",
+                    Width = 1920,
+                    Height = 1080,
+                    FramesPerSecond = 30,
+                    Duration = TimeSpan.FromMinutes(1),
+                    FileSizeBytes = 1000,
+                    HasAudio = true,
+                },
+                OutputBytes = 500,
+                SavedPercent = 50,
+            },
+        ]
     };
 
     private sealed class CompletingPipeline(TriageSummary summary) : ITriagePipeline

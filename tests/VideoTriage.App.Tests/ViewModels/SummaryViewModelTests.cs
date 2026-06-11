@@ -6,122 +6,108 @@ namespace VideoTriage.App.Tests.ViewModels;
 
 public sealed class SummaryViewModelTests
 {
-    [Fact]
-    public void ZeroFileRun_UsesZeroSafeValues()
-    {
-        var viewModel = new SummaryViewModel(Summary());
-
-        viewModel.ProcessedCount.ShouldBe(0);
-        viewModel.KeptCount.ShouldBe(0);
-        viewModel.BytesSavedText.ShouldBe("0 B");
-        viewModel.AverageReductionPercent.ShouldBe(0);
-        viewModel.AverageReductionText.ShouldBe("0.0%");
-        viewModel.Segments.Sum(x => x.Count).ShouldBe(0);
-        viewModel.Files.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Projection_FormatsBytesAndComputesWeightedReduction()
-    {
-        var summary = Summary(
-            scanned: 2,
-            replaced: 2,
-            bytesSaved: 750,
-            files:
-            [
-                File("a.mp4", TriageOutcome.Replaced, sourceBytes: 1000, outputBytes: 500),
-                File("b.mp4", TriageOutcome.ReplacePartial, sourceBytes: 500, outputBytes: 250)
-            ]);
-
-        var viewModel = new SummaryViewModel(summary);
-
-        viewModel.BytesSavedText.ShouldBe("750 B");
-        viewModel.AverageReductionPercent.ShouldBe(50);
-        viewModel.AverageReductionText.ShouldBe("50.0%");
-    }
-
-    [Fact]
-    public void Projection_DoesNotDoubleCountMarginalReplacements()
-    {
-        var viewModel = new SummaryViewModel(Summary(
-            scanned: 15,
-            replaced: 3,
-            marginal: 2,
-            grew: 2,
-            invalid: 1,
-            failed: 4,
-            skipped: 5));
-
-        viewModel.KeptCount.ShouldBe(12);
-        viewModel.Segments.ShouldBe([
-            new SummarySegment("Replaced", 3, "#36C98F"),
-            new SummarySegment("Kept / grew", 2, "#F5A524"),
-            new SummarySegment("Invalid", 1, "#8B93A7"),
-            new SummarySegment("Failed", 4, "#F05252"),
-            new SummarySegment("Skipped", 5, "#5B8DEF")
-        ]);
-        viewModel.Segments.Sum(x => x.Count).ShouldBe(15);
-    }
-
-    [Fact]
-    public void Projection_UsesTerminalFileMessages()
-    {
-        var viewModel = new SummaryViewModel(Summary(
-            scanned: 1,
-            files: [File("clip.mp4", TriageOutcome.OutputInvalid, 1000, null, "Decode failed")]));
-
-        viewModel.Files.Single().ShouldBe(new SummaryFileResult(
-            "clip.mp4", "OutputInvalid", "Decode failed", null, null));
-    }
-
-    private static TriageSummary Summary(
-        int scanned = 0,
-        int replaced = 0,
-        int marginal = 0,
-        int grew = 0,
-        int invalid = 0,
-        int failed = 0,
-        int skipped = 0,
-        long bytesSaved = 0,
-        IReadOnlyList<FileProgress>? files = null) => new()
-        {
-            Scanned = scanned,
-            Candidates = replaced + grew + invalid + failed,
-            Replaced = replaced,
-            Marginal = marginal,
-            Grew = grew,
-            Invalid = invalid,
-            Failed = failed,
-            Skipped = skipped,
-            BytesSaved = bytesSaved,
-            StartedAtUtc = DateTimeOffset.UtcNow,
-            CompletedAtUtc = DateTimeOffset.UtcNow,
-            Files = files ?? []
-        };
-
-    private static FileProgress File(
-        string path,
-        TriageOutcome outcome,
-        long sourceBytes,
-        long? outputBytes,
-        string message = "done") => new()
+    private static FileProgress Done(string path, TriageOutcome o, long src = 0, long? outBytes = null, double? saved = null) =>
+        new()
         {
             FilePath = path,
             Phase = TriagePhase.Done,
-            Outcome = outcome,
-            Source = new VideoStats
+            Outcome = o,
+            Source = src == 0 ? null : new VideoStats
             {
-                FilePath = path,
-                FileSizeBytes = sourceBytes,
-                Duration = TimeSpan.FromMinutes(1),
-                Width = 1920,
-                Height = 1080,
-                FramesPerSecond = 30,
-                VideoBitrateBitsPerSecond = 10_000_000,
-                CodecName = "h264",
-                HasAudio = true
+                FilePath = path, CodecName = "h264", Width = 1920, Height = 1080,
+                FramesPerSecond = 30, Duration = TimeSpan.FromMinutes(1), FileSizeBytes = src, HasAudio = true,
             },
-            OutputBytes = outputBytes,
-            Message = message
+            OutputBytes = outBytes,
+            SavedPercent = saved,
         };
+
+    private static TriageSummary Summary(params FileProgress[] files) => new()
+    {
+        Scanned = files.Length, Candidates = files.Length, Replaced = 0, Marginal = 0,
+        Grew = 0, Invalid = 0, Failed = 0, Skipped = 0, BytesSaved = 0,
+        StartedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-2),
+        CompletedAtUtc = DateTimeOffset.UtcNow,
+        Files = files,
+    };
+
+    [Fact]
+    public void Files_ExcludeNonProcessedOutcomes()
+    {
+        var vm = new SummaryViewModel(Summary(
+            Done(@"C:\a.mp4", TriageOutcome.Replaced, 1000, 500, 50),
+            Done(@"C:\b.mp4", TriageOutcome.SkippedAlreadyAv1),
+            Done(@"C:\c.mp4", TriageOutcome.SkippedLowBpp),
+            Done(@"C:\d.mp4", TriageOutcome.InsufficientSpace, 2000)));
+
+        vm.Files.Select(f => f.FileName).ShouldBe(["a.mp4", "d.mp4"], ignoreOrder: true);
+        vm.ProcessedCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Segments_ReconcileWithProcessedCount()
+    {
+        var vm = new SummaryViewModel(Summary(
+            Done(@"C:\a.mp4", TriageOutcome.Replaced, 1000, 500, 50),
+            Done(@"C:\e.mp4", TriageOutcome.GrewKeptOriginal, 1000, 1100),
+            Done(@"C:\f.mp4", TriageOutcome.EncodeFailed, 1000)));
+
+        vm.Segments.Sum(s => s.Count).ShouldBe(vm.ProcessedCount);
+        vm.Segments.Select(s => s.Label).ShouldContain("Replaced");
+        vm.Segments.Select(s => s.Label).ShouldContain("Kept larger");
+        vm.Segments.Select(s => s.Label).ShouldContain("Failed");
+    }
+
+    [Fact]
+    public void Severity_IsWarning_WhenAnyNonReplacedProcessed()
+    {
+        var ok = new SummaryViewModel(Summary(Done(@"C:\a.mp4", TriageOutcome.Replaced, 1000, 500, 50)));
+        ok.Severity.ShouldBe(SummarySeverity.Success);
+
+        var warn = new SummaryViewModel(Summary(
+            Done(@"C:\a.mp4", TriageOutcome.Replaced, 1000, 500, 50),
+            Done(@"C:\g.mp4", TriageOutcome.InsufficientSpace, 2000)));
+        warn.Severity.ShouldBe(SummarySeverity.Warning);
+    }
+
+    [Fact]
+    public void EmptyRun_SeverityNone()
+    {
+        new SummaryViewModel(Summary()).Severity.ShouldBe(SummarySeverity.None);
+    }
+
+    [Fact]
+    public void ReplacedRow_HasSizeTransitionAndSaved()
+    {
+        var vm = new SummaryViewModel(Summary(Done(@"C:\a.mp4", TriageOutcome.Replaced, 1000, 500, 50)));
+        var row = vm.Files.Single();
+        row.OldSizeText.ShouldNotBeNullOrEmpty();
+        row.NewSizeText.ShouldNotBeNullOrEmpty();
+        row.SavedText.ShouldContain("50");
+        row.StatusLabel.ShouldBe("Replaced");
+    }
+
+    [Fact]
+    public void NonReplacedRow_HasNoNewSizeNoSaved()
+    {
+        var vm = new SummaryViewModel(Summary(Done(@"C:\e.mp4", TriageOutcome.GrewKeptOriginal, 1000, 1100)));
+        var row = vm.Files.Single();
+        row.NewSizeText.ShouldBeNullOrEmpty();
+        row.SavedText.ShouldBeNull();
+        row.StatusLabel.ShouldBe(TriageOutcomeDisplay.Label(TriageOutcome.GrewKeptOriginal));
+    }
+
+    [Fact]
+    public void DurationText_IsPresent()
+    {
+        var vm = new SummaryViewModel(Summary(Done(@"C:\a.mp4", TriageOutcome.Replaced, 1000, 500, 50)));
+        vm.DurationText.ShouldNotBeNullOrWhiteSpace();
+        vm.CompletedAtText.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public void RevealCommand_NullPath_DoesNotThrow()
+    {
+        var vm = new SummaryViewModel(Summary(Done(@"C:\a.mp4", TriageOutcome.Replaced, 1000, 500, 50)));
+        vm.RevealCommand.Execute(null);
+    }
 }
