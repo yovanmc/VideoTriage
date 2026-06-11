@@ -42,6 +42,7 @@ public sealed record FileProgress
     public double? SavedPercent { get; init; }
     public string? Message { get; init; }
     public string? FinalPath { get; init; }
+    public int? EtaSeconds { get; init; }
 }
 
 public sealed record TriageSummary
@@ -55,5 +56,7 @@ public sealed record TriageSummary
     public required int Failed { get; init; }
     public required int Skipped { get; init; }
     public required long BytesSaved { get; init; }
+    public required DateTimeOffset StartedAtUtc { get; init; }
+    public required DateTimeOffset CompletedAtUtc { get; init; }
     public required IReadOnlyList<FileProgress> Files { get; init; }
 }

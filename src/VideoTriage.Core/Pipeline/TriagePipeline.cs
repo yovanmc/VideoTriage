@@ -411,7 +411,7 @@ public sealed class TriagePipeline(
         }
 
         activeJournal?.Clear();
-        return Summarize(results, options);
+        return Summarize(results, options, startedAtUtc, DateTimeOffset.UtcNow);
     }
 
     private static Task WaitWhilePausedAsync(PauseToken? pauseToken, CancellationToken cancellationToken) =>
@@ -439,7 +439,11 @@ public sealed class TriagePipeline(
         _ => TriageOutcome.InvalidMetadata
     };
 
-    private static TriageSummary Summarize(IReadOnlyList<FileProgress> files, TriageOptions options)
+    private static TriageSummary Summarize(
+        IReadOnlyList<FileProgress> files,
+        TriageOptions options,
+        DateTimeOffset startedAtUtc,
+        DateTimeOffset completedAtUtc)
     {
         var replaced = files
             .Where(f => f.Outcome is TriageOutcome.Replaced or TriageOutcome.ReplacePartial)
@@ -471,6 +475,8 @@ public sealed class TriagePipeline(
                 TriageOutcome.AlreadyCompleted,
                 TriageOutcome.DryRunCandidate),
             BytesSaved = bytesSaved,
+            StartedAtUtc = startedAtUtc,
+            CompletedAtUtc = completedAtUtc,
             Files = files
         };
     }

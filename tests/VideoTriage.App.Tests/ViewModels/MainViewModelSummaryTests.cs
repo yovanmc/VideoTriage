@@ -104,6 +104,8 @@ public sealed class MainViewModelSummaryTests
         Failed = 0,
         Skipped = 0,
         BytesSaved = 500,
+        StartedAtUtc = DateTimeOffset.UtcNow,
+        CompletedAtUtc = DateTimeOffset.UtcNow,
         Files = []
     };
 
