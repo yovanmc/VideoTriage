@@ -7,13 +7,16 @@ namespace VideoTriage.App.Tests.ViewModels;
 public sealed class TriageOutcomeDisplayTests
 {
     [Fact]
-    public void Label_CoversEveryOutcome_NoBlanksNoEnumNames()
+    public void Label_CoversEveryOutcome_NoBlanksNoRawEnumNames()
     {
         foreach (TriageOutcome o in Enum.GetValues<TriageOutcome>())
         {
             var label = TriageOutcomeDisplay.Label(o);
             label.ShouldNotBeNullOrWhiteSpace();
-            label.ShouldNotBe(o.ToString());
+            // Raw multi-word PascalCase enum names must be humanized. "Replaced" is already a
+            // clean English word, so it is allowed to coincide with the enum name.
+            if (o is not TriageOutcome.Replaced)
+                label.ShouldNotBe(o.ToString());
         }
     }
 

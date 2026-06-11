@@ -18,7 +18,7 @@ public static class TriageOutcomeDisplay
 
     public static string Label(TriageOutcome? outcome) => outcome switch
     {
-        TriageOutcome.Replaced => "Re-encoded & replaced",
+        TriageOutcome.Replaced => "Replaced",
         TriageOutcome.ReplacePartial => "Replaced (recoverable partial)",
         TriageOutcome.GrewKeptOriginal => "Kept — encode was larger",
         TriageOutcome.OutputInvalid => "Verification failed — kept original",
