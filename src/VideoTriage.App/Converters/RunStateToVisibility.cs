@@ -21,6 +21,7 @@ public sealed class RunStateToVisibility : IValueConverter
             "Running" => state == RunState.Running,
             "Paused" => state == RunState.Paused,
             "RunningOrPaused" => state is RunState.Running or RunState.Paused,
+            "Active" => state is RunState.Running or RunState.Paused or RunState.Stopping,
             _ => false,
         };
 

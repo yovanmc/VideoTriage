@@ -123,7 +123,7 @@
                                 Width="92"
                                 Background="{StaticResource DangerBrush}"
                                 Command="{Binding StopCommand}"
-                                Visibility="{Binding RunState, Converter={StaticResource RunStateToVisibility}, ConverterParameter=RunningOrPaused}" />
+                                Visibility="{Binding RunState, Converter={StaticResource RunStateToVisibility}, ConverterParameter=Active}" />
                         <Button x:Name="PauseButton"
                                 Content="Pause"
                                 Width="92"
