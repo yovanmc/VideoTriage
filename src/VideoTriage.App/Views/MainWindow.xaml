@@ -212,8 +212,8 @@
                                             CornerRadius="4"
                                             ClipToBounds="True"
                                             Background="#247F7F7F">
-                                        <Image Source="{Binding Thumbnail, Mode=OneWay}"
-                                               Stretch="UniformToFill" />
+                                        <Image Source="{Binding Thumbnail, Mode=OneWay}" Stretch="Uniform"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
                                     </Border>
                                     <StackPanel Grid.Column="1" Margin="14,0">
                                         <TextBlock Text="{Binding FileName}"
