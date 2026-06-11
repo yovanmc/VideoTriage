@@ -32,7 +32,7 @@ public sealed class MainViewModelDiagnosticsTests
         errors.Errors.Single().Message.ShouldContain("completed replacements may already be present");
         errors.Errors.Single().Message.ShouldContain(appLog.CurrentLogPath);
         diagnostics.ErrorCount.ShouldBe(1);
-        viewModel.StatusMessage.ShouldBe("Run failed. See Diagnostics for details.");
+        viewModel.StatusMessage.ShouldBe("Run failed — see log");
     }
 
     [Fact]

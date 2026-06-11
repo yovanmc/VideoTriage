@@ -371,7 +371,7 @@ public sealed class MainViewModel : ObservableObject
                 $"Review the queue and log before retrying: {_appLog?.CurrentLogPath ?? "log unavailable"}",
                 exception.Message);
             Diagnostics?.Refresh();
-            StatusMessage = "Run failed. See Diagnostics for details.";
+            StatusMessage = "Run failed — see log";
         }
         finally
         {
