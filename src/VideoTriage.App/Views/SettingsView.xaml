@@ -1,24 +1,30 @@
 <UserControl x:Class="VideoTriage.App.Views.SettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/VideoTriage.App;component/Resources/DesignTokens.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
     <StackPanel>
-        <!-- Matches the uppercase caption rhythm of the other sidebar section headers. -->
-        <TextBlock Text="SETTINGS" FontSize="11" FontWeight="SemiBold" Opacity="0.85" Foreground="{DynamicResource AccentBrush}" />
+        <TextBlock Text="SETTINGS" Margin="{StaticResource SectionGap}" Style="{StaticResource SectionHeader}" />
 
-        <TextBlock Margin="0,10,0,4" Text="Candidate BPP threshold" />
+        <TextBlock Margin="{StaticResource FieldLabelMargin}" Text="Candidate BPP threshold" />
         <TextBox Text="{Binding CandidateBppThreshold, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
-        <TextBlock Text="Allowed range 0–1" Opacity="0.55" FontSize="11" />
+        <TextBlock Text="Allowed range 0–1" Style="{StaticResource Caption}" />
 
-        <TextBlock Margin="0,10,0,4" Text="Minimum free space (GB)" />
+        <TextBlock Margin="{StaticResource FieldLabelMargin}" Text="Minimum free space (GB)" />
         <TextBox Text="{Binding MinimumFreeGigabytes, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}" />
-        <TextBlock Text="At least 1 GB" Opacity="0.55" FontSize="11" />
+        <TextBlock Text="At least 1 GB" Style="{StaticResource Caption}" />
 
-        <TextBlock Margin="0,10,0,4" Text="Original deletion" />
+        <TextBlock Margin="{StaticResource FieldLabelMargin}" Text="Original deletion" />
         <ComboBox ItemsSource="{Binding DeleteModes}"
                   SelectedItem="{Binding DeleteMode}" />
         <CheckBox Margin="0,6,0,0"
                   Content="I confirm permanent deletion"
-                  Foreground="#FF6B6B"
+                  Foreground="{DynamicResource DangerBrush}"
                   IsChecked="{Binding ConfirmPermanentDelete}" />
 
         <CheckBox Margin="0,10,0,0"
@@ -34,7 +40,7 @@
         </CheckBox>
 
         <TextBlock Margin="0,8,0,0"
-                   Foreground="#FF6B6B"
+                   Foreground="{DynamicResource DangerBrush}"
                    TextWrapping="Wrap"
                    Text="{Binding ValidationMessage}">
             <TextBlock.Style>

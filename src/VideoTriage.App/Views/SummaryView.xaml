@@ -4,10 +4,14 @@
              xmlns:controls="clr-namespace:VideoTriage.App.Controls"
              xmlns:conv="clr-namespace:VideoTriage.App.Converters">
     <UserControl.Resources>
-        <conv:StringToBrush x:Key="StringToBrush" />
-        <conv:StringToBrushFaint x:Key="StringToBrushFaint" />
-        <SolidColorBrush x:Key="DangerBrush" Color="#FF6B6B" />
-        <SolidColorBrush x:Key="SuccessBrush" Color="#5AD17F" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/VideoTriage.App;component/Resources/DesignTokens.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <conv:StringToBrush x:Key="StringToBrush" />
+            <conv:StringToBrushFaint x:Key="StringToBrushFaint" />
+            <conv:ProgressCountConverter x:Key="ProgressCountConverter" />
+        </ResourceDictionary>
     </UserControl.Resources>
 
     <Grid Margin="24">
@@ -61,14 +65,22 @@
 
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Grid Width="180" Height="180">
-                    <controls:DonutChart ItemsSource="{Binding Segments}" />
+                    <controls:DonutChart x:Name="Donut" ItemsSource="{Binding Segments}" />
                     <StackPanel HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 IsHitTestVisible="False">
-                        <TextBlock Text="{Binding ProcessedCount}"
-                                   FontSize="22"
+                        <!-- Center tally counts 0→N in lock-step with the ring sweep
+                             (DonutChart.AnimatedProgress), then holds at ProcessedCount. -->
+                        <TextBlock FontSize="22"
                                    FontWeight="SemiBold"
-                                   HorizontalAlignment="Center" />
+                                   HorizontalAlignment="Center">
+                            <TextBlock.Text>
+                                <MultiBinding Converter="{StaticResource ProgressCountConverter}">
+                                    <Binding Path="AnimatedProgress" ElementName="Donut" />
+                                    <Binding Path="ProcessedCount" />
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
                         <TextBlock Text="processed"
                                    FontSize="11"
                                    Opacity="0.6"
@@ -93,20 +105,20 @@
 
             <UniformGrid Grid.Column="1" Columns="2" Margin="28,0,0,0" VerticalAlignment="Center">
                 <StackPanel Margin="8">
-                    <TextBlock Text="Space saved" Opacity="0.65" />
-                    <TextBlock Text="{Binding BytesSavedText}" FontSize="24" />
+                    <TextBlock Text="Space saved" Style="{StaticResource Caption}" />
+                    <TextBlock Text="{Binding BytesSavedText}" Style="{StaticResource StatValue}" />
                 </StackPanel>
                 <StackPanel Margin="8">
-                    <TextBlock Text="Replaced" Opacity="0.65" />
-                    <TextBlock Text="{Binding ReplacedCount}" FontSize="24" />
+                    <TextBlock Text="Replaced" Style="{StaticResource Caption}" />
+                    <TextBlock Text="{Binding ReplacedCount}" Style="{StaticResource StatValue}" />
                 </StackPanel>
                 <StackPanel Margin="8">
-                    <TextBlock Text="Kept original" Opacity="0.65" />
-                    <TextBlock Text="{Binding KeptOriginalCount}" FontSize="24" />
+                    <TextBlock Text="Kept original" Style="{StaticResource Caption}" />
+                    <TextBlock Text="{Binding KeptOriginalCount}" Style="{StaticResource StatValue}" />
                 </StackPanel>
                 <StackPanel Margin="8">
-                    <TextBlock Text="Overall reduction" Opacity="0.65" />
-                    <TextBlock Text="{Binding OverallReductionText}" FontSize="24" />
+                    <TextBlock Text="Overall reduction" Style="{StaticResource Caption}" />
+                    <TextBlock Text="{Binding OverallReductionText}" Style="{StaticResource StatValue}" />
                 </StackPanel>
             </UniformGrid>
         </Grid>
@@ -126,23 +138,12 @@
                             </Grid.ColumnDefinitions>
 
                             <Border Width="56" Height="32"
-                                    Background="#247F7F7F"
+                                    CornerRadius="{StaticResource ControlRadius}"
+                                    Background="{StaticResource ThumbPlaceholderBrush}"
                                     ClipToBounds="True"
                                     VerticalAlignment="Center">
-                                <!-- Opacity defaults to 1 so a thumbnail is never stuck hidden if
-                                     TargetUpdated doesn't fire; From=0 only adds a fade on arrival. -->
-                                <Image Source="{Binding Thumbnail, NotifyOnTargetUpdated=True}" Stretch="Uniform">
-                                    <Image.Triggers>
-                                        <EventTrigger RoutedEvent="Binding.TargetUpdated">
-                                            <BeginStoryboard>
-                                                <Storyboard>
-                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                     From="0" To="1" Duration="0:0:0.25" />
-                                                </Storyboard>
-                                            </BeginStoryboard>
-                                        </EventTrigger>
-                                    </Image.Triggers>
-                                </Image>
+                                <Image Source="{Binding Thumbnail, NotifyOnTargetUpdated=True}"
+                                       Style="{StaticResource ThumbnailImage}" />
                             </Border>
 
                             <TextBlock Grid.Column="1"
