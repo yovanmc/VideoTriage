@@ -107,9 +107,9 @@ public sealed class ProcessRunner : IProcessRunner
             await using var file = new FileStream(
                 stderrPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
             await using var writer = new StreamWriter(file);
-            while (await process.StandardError.ReadLineAsync() is { } line)
+            while (await process.StandardError.ReadLineAsync().ConfigureAwait(false) is { } line)
             {
-                await writer.WriteLineAsync(line);
+                await writer.WriteLineAsync(line).ConfigureAwait(false);
                 if (request.StandardErrorLines is not null)
                 {
                     try { request.StandardErrorLines.Report(line); }
@@ -120,7 +120,7 @@ public sealed class ProcessRunner : IProcessRunner
         else
         {
             // No file requested — drain stderr to prevent process hang on a full buffer.
-            while (await process.StandardError.ReadLineAsync() is { } line)
+            while (await process.StandardError.ReadLineAsync().ConfigureAwait(false) is { } line)
             {
                 if (request.StandardErrorLines is not null)
                 {
@@ -136,7 +136,7 @@ public sealed class ProcessRunner : IProcessRunner
         ProcessRequest request)
     {
         var buffer = new BoundedTextBuffer(request.StandardOutputLimitCharacters);
-        while (await process.StandardOutput.ReadLineAsync() is { } line)
+        while (await process.StandardOutput.ReadLineAsync().ConfigureAwait(false) is { } line)
         {
             buffer.Append(line);
             if (request.StandardOutputLines is not null)

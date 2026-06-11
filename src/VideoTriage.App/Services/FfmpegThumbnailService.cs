@@ -45,8 +45,7 @@ public sealed class FfmpegThumbnailService : IThumbnailService, IDisposable
                 if (!File.Exists(pngPath) || new FileInfo(pngPath).Length == 0)
                     return null;
 
-                var bitmap = LoadBitmapOnSta(pngPath);
-                return bitmap;
+                return LoadFrozenBitmap(pngPath);
             }
             finally
             {
@@ -61,38 +60,20 @@ public sealed class FfmpegThumbnailService : IThumbnailService, IDisposable
 
     public void Dispose() => _semaphore.Dispose();
 
-    private static BitmapSource? LoadBitmapOnSta(string pngPath)
+    // A BitmapImage decoded with OnLoad and then Frozen has no thread affinity, so it can be
+    // built directly on the calling worker thread — no dedicated STA thread (and its create/Join
+    // cost) is needed. This runs once per file, so avoiding a thread spin-up per thumbnail matters
+    // on large folders.
+    private static BitmapSource LoadFrozenBitmap(string pngPath)
     {
-        BitmapSource? result = null;
-        Exception? capturedException = null;
-
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                using var stream = new FileStream(pngPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                var img = new BitmapImage();
-                img.BeginInit();
-                img.CacheOption = BitmapCacheOption.OnLoad;
-                img.StreamSource = stream;
-                img.DecodePixelWidth = 96;
-                img.EndInit();
-                img.Freeze();
-                result = img;
-            }
-            catch (Exception ex)
-            {
-                capturedException = ex;
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.IsBackground = true;
-        thread.Start();
-        thread.Join();
-
-        if (capturedException is not null)
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(capturedException).Throw();
-
-        return result;
+        using var stream = new FileStream(pngPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        var img = new BitmapImage();
+        img.BeginInit();
+        img.CacheOption = BitmapCacheOption.OnLoad;
+        img.StreamSource = stream;
+        img.DecodePixelWidth = 96;
+        img.EndInit();
+        img.Freeze();
+        return img;
     }
 }
