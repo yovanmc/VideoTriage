@@ -84,7 +84,9 @@ public sealed class FileItemViewModelProgressTests
 
         vm.StatusText.ShouldContain("saved 67.5%");
         vm.OldSizeText.ShouldNotBeNullOrEmpty();
-        vm.SavedText.ShouldContain("-67.5%");
+        // Saved % shows only on the status line, not duplicated in the green new-size line.
+        vm.SavedText.ShouldNotContain("%");
+        vm.IsComplete.ShouldBeTrue();
         vm.FinalPath.ShouldBe(@"C:\Videos\clip.mp4");
     }
 

@@ -82,8 +82,26 @@ public sealed class FileItemViewModelTests
         row.Apply(fp);
 
         row.OldSizeText.ShouldBe(HumanSize.Format(30_000_000));
-        row.SavedText.ShouldContain(HumanSize.Format(19_500_000));
-        row.SavedText.ShouldContain("-35%");
+        // Green line shows only the new size; the saved % lives on the status line.
+        row.SavedText.ShouldBe(HumanSize.Format(19_500_000));
+        row.SavedText.ShouldNotContain("%");
+        row.StatusText.ShouldContain("saved 35%");
+        row.IsComplete.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Apply_GrewKeptOriginal_IsNotComplete()
+    {
+        var row = new FileItemViewModel(@"C:\videos\movie.mp4");
+
+        row.Apply(new FileProgress
+        {
+            FilePath = row.FilePath,
+            Phase = TriagePhase.Done,
+            Outcome = TriageOutcome.GrewKeptOriginal
+        });
+
+        row.IsComplete.ShouldBeFalse();
     }
 
     [Fact]
