@@ -227,7 +227,17 @@
                                                      Minimum="0"
                                                      Maximum="100"
                                                      IsIndeterminate="{Binding IsProgressIndeterminate, Mode=OneWay}"
-                                                     Value="{Binding Progress, Mode=OneWay}" />
+                                                     Value="{Binding Progress, Mode=OneWay}">
+                                            <ProgressBar.Style>
+                                                <Style TargetType="ProgressBar">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsComplete}" Value="True">
+                                                            <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ProgressBar.Style>
+                                        </ProgressBar>
                                     </StackPanel>
                                     <StackPanel Grid.Column="2">
                                         <TextBlock Text="{Binding StatusText}"

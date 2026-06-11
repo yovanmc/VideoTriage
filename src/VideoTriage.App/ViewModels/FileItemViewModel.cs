@@ -15,6 +15,7 @@ public sealed class FileItemViewModel : ObservableObject
     private bool _isProgressIndeterminate;
     private string _oldSizeText = "";
     private string _savedText = "";
+    private bool _isComplete;
     private string? _finalPath;
     private ImageSource? _thumbnail;
 
@@ -61,6 +62,13 @@ public sealed class FileItemViewModel : ObservableObject
     {
         get => _savedText;
         private set => SetProperty(ref _savedText, value);
+    }
+
+    /// <summary>True once the file finished with a successful encode/replace — drives the green progress bar.</summary>
+    public bool IsComplete
+    {
+        get => _isComplete;
+        private set => SetProperty(ref _isComplete, value);
     }
 
     public string? FinalPath
@@ -150,9 +158,9 @@ public sealed class FileItemViewModel : ObservableObject
 
         if (computedSavedPct.HasValue)
         {
+            // The saved % lives on the status line (DoneText) — keep this green line to the new size only.
             OldSizeText = HumanSize.Format(progressEvent.Source!.FileSizeBytes);
-            var pct = computedSavedPct.Value.ToString("0.#", CultureInfo.InvariantCulture);
-            SavedText = $"{HumanSize.Format(progressEvent.OutputBytes!.Value)}, -{pct}%";
+            SavedText = HumanSize.Format(progressEvent.OutputBytes!.Value);
         }
         else if (progressEvent.Phase == TriagePhase.Done)
         {
@@ -162,6 +170,9 @@ public sealed class FileItemViewModel : ObservableObject
 
         if (progressEvent.Phase == TriagePhase.Done)
             Progress = 100;
+
+        IsComplete = progressEvent.Phase == TriagePhase.Done
+            && progressEvent.Outcome is TriageOutcome.Replaced or TriageOutcome.ReplacePartial;
 
         IsProgressIndeterminate = progressEvent.Phase == TriagePhase.Encoding
             && !progressEvent.EncodeProgress.HasValue;
