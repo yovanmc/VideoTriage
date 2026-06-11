@@ -42,6 +42,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly object _thumbnailLock = new();
     private readonly Dictionary<string, FileItemViewModel> _queueIndex =
         new(StringComparer.OrdinalIgnoreCase);
+    private long _totalSourceBytes;
     private readonly Dictionary<string, FileProgress> _pendingProgress =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly object _pendingLock = new();
@@ -84,16 +85,26 @@ public sealed class MainViewModel : ObservableObject
         Items.CollectionChanged += (_, e) =>
         {
             if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+            {
                 _queueIndex.Clear();
+                _totalSourceBytes = 0;
+            }
             // Process removals BEFORE additions: a Move (and Replace) raises CollectionChanged
             // with the SAME row in both OldItems and NewItems. Add-then-remove would net-remove
             // the row from the index, dropping its later progress updates and its summary thumbnail.
+            // The running byte total keeps QueueSummaryText O(1) per change instead of O(n).
             if (e.OldItems is not null)
                 foreach (FileItemViewModel row in e.OldItems)
+                {
                     _queueIndex.Remove(row.FilePath);
+                    _totalSourceBytes -= row.SourceBytes;
+                }
             if (e.NewItems is not null)
                 foreach (FileItemViewModel row in e.NewItems)
+                {
                     _queueIndex[row.FilePath] = row;
+                    _totalSourceBytes += row.SourceBytes;
+                }
             StartCommand.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(StartBlockedReason));
             OnPropertyChanged(nameof(QueueSummaryText));
@@ -226,9 +237,8 @@ public sealed class MainViewModel : ObservableObject
         {
             var count = Items.Count;
             if (count == 0) return "No candidates";
-            var totalBytes = Items.Sum(i => i.SourceBytes);
             var noun = count == 1 ? "candidate" : "candidates";
-            return $"{count} {noun} · {VideoTriage.Core.Formatting.HumanSize.Format(totalBytes)}";
+            return $"{count} {noun} · {VideoTriage.Core.Formatting.HumanSize.Format(_totalSourceBytes)}";
         }
     }
 
@@ -434,15 +444,21 @@ public sealed class MainViewModel : ObservableObject
 
         row.Apply(fp);
 
-        var i = Items.IndexOf(row);
-        if (i < 0) return;
+        // Only the reorder branches need the row's position. Skip the O(n) Items.IndexOf for
+        // ordinary encode-progress ticks (the common, high-frequency case) — index just to float
+        // a freshly-started file to the top or sink a finished one to the bottom.
+        var needsFloat = fp.Phase == TriagePhase.Encoding && fp.EncodeProgress is null;
+        var isDone = fp.Phase == TriagePhase.Done;
+        if (needsFloat || isDone)
+        {
+            var i = Items.IndexOf(row);
+            if (needsFloat && i > 0)
+                Items.Move(i, 0);
+            else if (isDone && i >= 0 && i < Items.Count - 1)
+                Items.Move(i, Items.Count - 1);
+        }
 
-        if (fp.Phase == TriagePhase.Encoding && fp.EncodeProgress is null && i > 0)
-            Items.Move(i, 0);
-        else if (fp.Phase == TriagePhase.Done && i < Items.Count - 1)
-            Items.Move(i, Items.Count - 1);
-
-        if (fp.Phase == TriagePhase.Done)
+        if (isDone)
         {
             QueueRemainingCount = Math.Max(0, QueueRemainingCount - 1);
             _completedInRun++;

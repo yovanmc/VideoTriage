@@ -22,8 +22,16 @@
         <conv:NotNullToVisibility x:Key="NotNullToVisibility" />
         <conv:NullToVisibility x:Key="NullToVisibility" />
         <conv:BoolToVisibility x:Key="BoolToVisibility" />
-        <conv:SeverityToBrush x:Key="SeverityToBrush" />
         <conv:RunFailedToVisibility x:Key="RunFailedToVisibility" />
+
+        <!-- Uppercase caption style shared by every sidebar section header, for a
+             consistent typographic rhythm down the left rail. -->
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Opacity" Value="0.85" />
+        </Style>
     </ui:FluentWindow.Resources>
 
     <Grid>
@@ -48,7 +56,7 @@
                     BorderThickness="0,0,1,0">
                 <ScrollViewer VerticalScrollBarVisibility="Hidden">
                 <StackPanel>
-                    <TextBlock Text="Source folder" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
+                    <TextBlock Text="SOURCE FOLDER" Style="{StaticResource SectionHeader}" />
                     <TextBlock Margin="0,6,0,10"
                                Text="{Binding SelectedFolder}"
                                TextWrapping="Wrap"
@@ -56,13 +64,12 @@
                     <Button Content="Choose folder"
                             Command="{Binding ChooseFolderCommand}" />
 
-                    <TextBlock Margin="0,24,0,4" Text="Preset" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
+                    <TextBlock Margin="0,24,0,4" Text="PRESET" Style="{StaticResource SectionHeader}" />
                     <TextBlock Text="VideoTriage AV1 · read-only scan" Opacity="0.7" TextWrapping="Wrap" />
 
                     <TextBlock Margin="0,24,0,8"
-                               Text="Prerequisites"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource AccentBrush}" />
+                               Text="PREREQUISITES"
+                               Style="{StaticResource SectionHeader}" />
                     <ItemsControl ItemsSource="{Binding Prerequisites}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
@@ -211,8 +218,22 @@
                                             CornerRadius="4"
                                             ClipToBounds="True"
                                             Background="#247F7F7F">
-                                        <Image Source="{Binding Thumbnail, Mode=OneWay}" Stretch="Uniform"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <!-- Opacity defaults to 1 (visible) so a thumbnail is never stuck
+                                             hidden if TargetUpdated doesn't fire; the From=0 animation only
+                                             adds a fade when a new source actually arrives. -->
+                                        <Image Source="{Binding Thumbnail, Mode=OneWay, NotifyOnTargetUpdated=True}" Stretch="Uniform"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Image.Triggers>
+                                                <EventTrigger RoutedEvent="Binding.TargetUpdated">
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="0" To="1" Duration="0:0:0.25" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </EventTrigger>
+                                            </Image.Triggers>
+                                        </Image>
                                     </Border>
                                     <StackPanel Grid.Column="1" Margin="14,0">
                                         <TextBlock Text="{Binding FileName}"
@@ -298,8 +319,54 @@
         <Border Grid.Row="2"
                 Padding="18,0"
                 BorderBrush="#22000000"
-                BorderThickness="0,1,0,0"
-                Background="{Binding LastSummary.Severity, Converter={StaticResource SeverityToBrush}}">
+                BorderThickness="0,1,0,0">
+            <!-- Local, unfrozen brush so the status-bar tint can ColorAnimate between
+                 severities instead of snapping. -->
+            <Border.Background>
+                <SolidColorBrush Color="Transparent" />
+            </Border.Background>
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding LastSummary.Severity}" Value="Success">
+                            <DataTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <ColorAnimation Storyboard.TargetProperty="Background.Color"
+                                                        To="#335AD17F" Duration="0:0:0.3" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.EnterActions>
+                            <DataTrigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <ColorAnimation Storyboard.TargetProperty="Background.Color"
+                                                        To="Transparent" Duration="0:0:0.3" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.ExitActions>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding LastSummary.Severity}" Value="Warning">
+                            <DataTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <ColorAnimation Storyboard.TargetProperty="Background.Color"
+                                                        To="#33E8C35A" Duration="0:0:0.3" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.EnterActions>
+                            <DataTrigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <ColorAnimation Storyboard.TargetProperty="Background.Color"
+                                                        To="Transparent" Duration="0:0:0.3" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.ExitActions>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
             <Grid>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Border BorderBrush="#735CC8FF"

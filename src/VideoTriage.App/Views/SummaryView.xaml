@@ -11,6 +11,32 @@
     </UserControl.Resources>
 
     <Grid Margin="24">
+        <Grid.RenderTransform>
+            <TranslateTransform Y="0" />
+        </Grid.RenderTransform>
+        <!-- Gentle fade + rise when the summary first becomes visible. -->
+        <Grid.Style>
+            <Style TargetType="Grid">
+                <Style.Triggers>
+                    <Trigger Property="IsVisible" Value="True">
+                        <Trigger.EnterActions>
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                     From="0" To="1" Duration="0:0:0.18" />
+                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                                     From="8" To="0" Duration="0:0:0.18">
+                                        <DoubleAnimation.EasingFunction>
+                                            <CubicEase EasingMode="EaseOut" />
+                                        </DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </Trigger.EnterActions>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+        </Grid.Style>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -103,7 +129,20 @@
                                     Background="#247F7F7F"
                                     ClipToBounds="True"
                                     VerticalAlignment="Center">
-                                <Image Source="{Binding Thumbnail}" Stretch="Uniform" />
+                                <!-- Opacity defaults to 1 so a thumbnail is never stuck hidden if
+                                     TargetUpdated doesn't fire; From=0 only adds a fade on arrival. -->
+                                <Image Source="{Binding Thumbnail, NotifyOnTargetUpdated=True}" Stretch="Uniform">
+                                    <Image.Triggers>
+                                        <EventTrigger RoutedEvent="Binding.TargetUpdated">
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                     From="0" To="1" Duration="0:0:0.25" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </EventTrigger>
+                                    </Image.Triggers>
+                                </Image>
                             </Border>
 
                             <TextBlock Grid.Column="1"
