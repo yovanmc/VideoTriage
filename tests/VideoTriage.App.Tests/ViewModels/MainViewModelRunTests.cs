@@ -222,6 +222,31 @@ public sealed class MainViewModelRunTests
         vm.QueueRemainingCount.ShouldBe(3);
     }
 
+    [Fact]
+    public void StartBlockedReason_NoFolder_ExplainsWhy()
+    {
+        var vm = MakeViewModel(new FakeTriagePipeline([]));
+        vm.StartBlockedReason.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public void StartBlockedReason_Ready_IsNull()
+    {
+        var vm = MakeViewModel(new FakeTriagePipeline([]));
+        vm.SelectedFolder = @"C:\Videos";
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
+        vm.StartBlockedReason.ShouldBeNull();
+    }
+
+    [Fact]
+    public void QueueSummaryText_ShowsCount()
+    {
+        var vm = MakeViewModel(new FakeTriagePipeline([]));
+        vm.SelectedFolder = @"C:\Videos";
+        vm.Items.Add(new FileItemViewModel(@"C:\Videos\clip.mp4"));
+        vm.QueueSummaryText.ShouldContain("1 candidate");
+    }
+
     private static MainViewModel MakeViewModel(
         ITriagePipeline? pipeline,
         IUiDispatcher? dispatcher = null,

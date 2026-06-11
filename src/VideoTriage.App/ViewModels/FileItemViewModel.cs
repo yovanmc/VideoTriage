@@ -75,6 +75,8 @@ public sealed class FileItemViewModel : ObservableObject
         internal set => SetProperty(ref _thumbnail, value);
     }
 
+    public long SourceBytes { get; private set; }
+
     public void ApplyProbe(ProbeResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
@@ -93,6 +95,7 @@ public sealed class FileItemViewModel : ObservableObject
         }
 
         var stats = result.Stats;
+        SourceBytes = stats.FileSizeBytes;
         MetaLine =
             $"{stats.Width}x{stats.Height} | " +
             $"{stats.FramesPerSecond.ToString("0.##", CultureInfo.InvariantCulture)} fps | " +

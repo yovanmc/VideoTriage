@@ -23,6 +23,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly Func<string, IActiveRunJournal>? _activeRunJournalFactory;
     private readonly IThumbnailService? _thumbnailService;
     private readonly IApplicationWorkLifetime? _workLifetime;
+    private readonly IExplorerLauncher? _explorerLauncher;
     private CancellationTokenSource? _runCts;
     private CancellationTokenSource? _scanCts;
     private PauseToken? _pauseToken;
@@ -54,7 +55,8 @@ public sealed class MainViewModel : ObservableObject
         DiagnosticsViewModel? diagnostics = null,
         Func<string, IActiveRunJournal>? activeRunJournalFactory = null,
         IThumbnailService? thumbnailService = null,
-        IApplicationWorkLifetime? workLifetime = null)
+        IApplicationWorkLifetime? workLifetime = null,
+        IExplorerLauncher? explorerLauncher = null)
     {
         _scanner = scanner;
         _dialogService = dialogService;
@@ -65,6 +67,7 @@ public sealed class MainViewModel : ObservableObject
         _activeRunJournalFactory = activeRunJournalFactory;
         _thumbnailService = thumbnailService;
         _workLifetime = workLifetime;
+        _explorerLauncher = explorerLauncher;
         Settings = settings;
         Diagnostics = diagnostics;
         _optionsFactory = optionsFactory
@@ -85,6 +88,8 @@ public sealed class MainViewModel : ObservableObject
                 foreach (FileItemViewModel row in e.OldItems)
                     _queueIndex.Remove(row.FilePath);
             StartCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(StartBlockedReason));
+            OnPropertyChanged(nameof(QueueSummaryText));
         };
         PauseCommand = new RelayCommand(Pause, () => RunState == RunState.Running);
         ResumeCommand = new RelayCommand(Resume, () => RunState == RunState.Paused);
@@ -95,8 +100,14 @@ public sealed class MainViewModel : ObservableObject
             OpenDataDirectory,
             () => _lastRunDataDirectory is not null);
         BackToQueueCommand = new RelayCommand(BackToQueue, () => LastSummary is not null);
+        OpenLogCommand = new RelayCommand(OpenLog);
         if (settings is not null)
-            settings.PropertyChanged += (_, _) => StartCommand.NotifyCanExecuteChanged();
+            settings.PropertyChanged += (_, _) =>
+            {
+                StartCommand.NotifyCanExecuteChanged();
+                OnPropertyChanged(nameof(StartBlockedReason));
+                OnPropertyChanged(nameof(QueueSummaryText));
+            };
     }
 
     public ObservableCollection<FileItemViewModel> Items { get; } = [];
@@ -110,6 +121,7 @@ public sealed class MainViewModel : ObservableObject
     public IRelayCommand StopCommand { get; }
     public IRelayCommand OpenDataDirectoryCommand { get; }
     public IRelayCommand BackToQueueCommand { get; }
+    public IRelayCommand OpenLogCommand { get; }
 
     public string? SelectedFolder
     {
@@ -117,7 +129,11 @@ public sealed class MainViewModel : ObservableObject
         set
         {
             if (SetProperty(ref _selectedFolder, value))
+            {
                 StartCommand.NotifyCanExecuteChanged();
+                OnPropertyChanged(nameof(StartBlockedReason));
+                OnPropertyChanged(nameof(QueueSummaryText));
+            }
         }
     }
 
@@ -167,6 +183,30 @@ public sealed class MainViewModel : ObservableObject
     {
         get => _queueRemainingCount;
         private set => SetProperty(ref _queueRemainingCount, value);
+    }
+
+    public string? StartBlockedReason
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(SelectedFolder)) return "Choose a folder to scan.";
+            if (Items.Count == 0) return "No candidates found in this folder.";
+            if (_pipelineProvider?.Pipeline is null) return "Required video tools are unavailable.";
+            if (Settings is { CanRun: false }) return Settings.ValidationMessage ?? "Fix settings before starting.";
+            return null;
+        }
+    }
+
+    public string QueueSummaryText
+    {
+        get
+        {
+            var count = Items.Count;
+            if (count == 0) return "No candidates";
+            var totalBytes = Items.Sum(i => i.SourceBytes);
+            var noun = count == 1 ? "candidate" : "candidates";
+            return $"{count} {noun} · {VideoTriage.Core.Formatting.HumanSize.Format(totalBytes)}";
+        }
     }
 
     public async Task ChooseFolderAsync()
@@ -381,6 +421,13 @@ public sealed class MainViewModel : ObservableObject
         LastSummary = null;
         QueueRemainingCount = Items.Count;
         OpenDataDirectoryCommand.NotifyCanExecuteChanged();
+    }
+
+    private void OpenLog()
+    {
+        var path = _appLog?.CurrentLogPath;
+        if (!string.IsNullOrWhiteSpace(path))
+            _explorerLauncher?.Open(path);
     }
 
     private void NotifyCommandState()
