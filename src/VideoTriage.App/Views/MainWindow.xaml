@@ -111,13 +111,12 @@
                         BorderBrush="#22000000"
                         BorderThickness="0,0,0,1">
                     <StackPanel Orientation="Horizontal">
-                        <ui:Button x:Name="StartButton"
-                                   Content="Start"
-                                   Appearance="Primary"
-                                   Width="92"
-                                   Command="{Binding StartCommand}"
-                                   ToolTip="{Binding StartBlockedReason}"
-                                   Visibility="{Binding RunState, Converter={StaticResource RunStateToVisibility}, ConverterParameter=Idle}" />
+                        <Button x:Name="StartButton"
+                                Content="Start"
+                                Width="92"
+                                Command="{Binding StartCommand}"
+                                ToolTip="{Binding StartBlockedReason}"
+                                Visibility="{Binding RunState, Converter={StaticResource RunStateToVisibility}, ConverterParameter=Idle}" />
                         <Button x:Name="StopButton"
                                 Content="Stop"
                                 Width="92"
