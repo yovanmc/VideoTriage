@@ -17,7 +17,6 @@ namespace VideoTriage.Core.Pipeline;
 /// </summary>
 public sealed class TriagePipeline(
     IRunLeaseFactory runLeaseFactory,
-    IVideoFileDiscovery discovery,
     IFfprobeService ffprobe,
     IVideoClassifier classifier,
     IVideoEncoder encoder,
@@ -34,12 +33,14 @@ public sealed class TriagePipeline(
 {
     public async Task<TriageSummary> RunAsync(
         string folder,
+        IReadOnlyList<string> filePaths,
         TriageOptions options,
-        bool recursive = false,
         IProgress<FileProgress>? progress = null,
         PauseToken? pauseToken = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(folder);
+        ArgumentNullException.ThrowIfNull(filePaths);
         ArgumentNullException.ThrowIfNull(options);
 
         var results = new List<FileProgress>();
@@ -163,7 +164,7 @@ public sealed class TriagePipeline(
             }
         }
 
-        var allFiles = discovery.EnumerateVideos(folder, options, recursive).ToList();
+        var allFiles = filePaths.ToList();
         var startedAtUtc = DateTimeOffset.UtcNow;
 
         activeJournal?.Save(new ActiveRunState

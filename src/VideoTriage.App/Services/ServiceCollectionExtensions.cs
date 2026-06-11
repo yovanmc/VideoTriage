@@ -121,7 +121,6 @@ public static class ServiceCollectionExtensions
                 "VideoTriage AV1");
             ITriagePipeline pipeline = new TriagePipeline(
                 sp.GetRequiredService<IRunLeaseFactory>(),
-                sp.GetRequiredService<IVideoFileDiscovery>(),
                 ffprobe,
                 sp.GetRequiredService<IVideoClassifier>(),
                 encoder,

@@ -207,8 +207,7 @@ public sealed class MainViewModel : ObservableObject
                     var row = new FileItemViewModel(result.FilePath);
                     row.ApplyProbe(result);
                     Items.Add(row);
-                    if (result.Stats?.AttachedPicStreamIndex is { } streamIndex)
-                        TrackThumbnail(row, result.FilePath, streamIndex);
+                    TrackThumbnail(row, result.FilePath, result.Stats?.AttachedPicStreamIndex ?? IThumbnailService.VideoStream);
                 }));
 
             await _scanner.ScanAsync(
@@ -268,8 +267,8 @@ public sealed class MainViewModel : ObservableObject
 
             var runTask = pipeline.RunAsync(
                 SelectedFolder!,
+                Items.Select(r => r.FilePath).ToList(),
                 options,
-                recursive: Settings?.Recursive ?? true,
                 progress,
                 _pauseToken,
                 _runCts.Token);

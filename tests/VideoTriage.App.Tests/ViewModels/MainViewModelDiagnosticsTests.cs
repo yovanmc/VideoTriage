@@ -77,8 +77,8 @@ public sealed class MainViewModelDiagnosticsTests
     {
         public Task<TriageSummary> RunAsync(
             string folder,
+            IReadOnlyList<string> filePaths,
             TriageOptions options,
-            bool recursive = false,
             IProgress<FileProgress>? progress = null,
             PauseToken? pauseToken = null,
             CancellationToken cancellationToken = default) =>
@@ -89,8 +89,8 @@ public sealed class MainViewModelDiagnosticsTests
     {
         public Task<TriageSummary> RunAsync(
             string folder,
+            IReadOnlyList<string> filePaths,
             TriageOptions options,
-            bool recursive = false,
             IProgress<FileProgress>? progress = null,
             PauseToken? pauseToken = null,
             CancellationToken cancellationToken = default) =>

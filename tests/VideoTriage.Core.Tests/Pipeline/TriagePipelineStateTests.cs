@@ -17,7 +17,7 @@ public sealed class TriagePipelineStateTests
     {
         var fakes = PipelineStateFakes.WithCompletedEntry();
 
-        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        var result = await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineStateFakes.FilePath], new TriageOptions());
 
         fakes.ProbeCalls.ShouldBe(0);
         fakes.CompletedLoadCalls.ShouldBe(1);
@@ -33,7 +33,7 @@ public sealed class TriagePipelineStateTests
         var fakes = PipelineStateFakes.WithCompletedEntry();
         fakes.SourceBytes++;
 
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineStateFakes.FilePath], new TriageOptions());
 
         fakes.ProbeCalls.ShouldBe(1);
         fakes.CompletedAppends.Single().SourceLength.ShouldBe(fakes.SourceBytes);
@@ -45,7 +45,7 @@ public sealed class TriagePipelineStateTests
         var fakes = PipelineStateFakes.WithCompletedEntry();
         fakes.SourceLastWrite = fakes.SourceLastWrite.AddMinutes(1);
 
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineStateFakes.FilePath], new TriageOptions());
 
         fakes.ProbeCalls.ShouldBe(1);
         fakes.CompletedAppends.Single().SourceLastWriteUtc.ShouldBe(fakes.SourceLastWrite);
@@ -57,7 +57,7 @@ public sealed class TriagePipelineStateTests
         var fakes = PipelineStateFakes.WithCompletedEntry(sourceLength: 999);
         fakes.AddCompletedEntry(sourceLength: fakes.SourceBytes);
 
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineStateFakes.FilePath], new TriageOptions());
 
         fakes.ProbeCalls.ShouldBe(0);
         fakes.CompletedLoadCalls.ShouldBe(1);
@@ -69,7 +69,7 @@ public sealed class TriagePipelineStateTests
         var fakes = PipelineStateFakes.WithSuccessfulReplacement();
         fakes.AddCompletedEntry(sourceLength: fakes.SourceBytes, sourcePath: "\0");
 
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineStateFakes.FilePath], new TriageOptions());
 
         fakes.ProbeCalls.ShouldBe(1);
         fakes.CompletedAppends.Single().Outcome.ShouldBe(TriageOutcome.Replaced);
@@ -80,7 +80,7 @@ public sealed class TriagePipelineStateTests
     {
         var fakes = PipelineStateFakes.WithSuccessfulReplacement();
 
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineStateFakes.FilePath], new TriageOptions());
 
         fakes.CompletedAppends.Single().Outcome.ShouldBe(TriageOutcome.Replaced);
         var manifest = fakes.ManifestAppends.Single();
@@ -105,7 +105,7 @@ public sealed class TriagePipelineStateTests
         var fakes = PipelineStateFakes.WithSuccessfulReplacement();
         fakes.Classification = ClassificationOutcome.SkipLowBpp;
 
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineStateFakes.FilePath], new TriageOptions());
 
         fakes.CompletedAppends.Single().Outcome.ShouldBe(TriageOutcome.SkippedLowBpp);
         fakes.ManifestAppends.ShouldBeEmpty();
@@ -118,7 +118,7 @@ public sealed class TriagePipelineStateTests
         var fakes = PipelineStateFakes.WithSuccessfulReplacement();
         fakes.ProbeSucceeds = false;
 
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineStateFakes.FilePath], new TriageOptions());
 
         fakes.ResultAppends.Single().Outcome.ShouldBe(TriageOutcome.InvalidMetadata);
         fakes.CompletedAppends.ShouldBeEmpty();
@@ -132,7 +132,7 @@ public sealed class TriagePipelineStateTests
         fakes.ReplaceOutcome = ReplaceOutcome.Failed;
         fakes.OriginalRemoved = false;
 
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineStateFakes.FilePath], new TriageOptions());
 
         fakes.CompletedAppends.ShouldBeEmpty();
         fakes.ManifestAppends.ShouldBeEmpty();
@@ -144,7 +144,7 @@ public sealed class TriagePipelineStateTests
     {
         var fakes = PipelineStateFakes.WithSuccessfulReplacement();
 
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions { DryRun = true });
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineStateFakes.FilePath], new TriageOptions { DryRun = true });
 
         fakes.CompletedAppends.ShouldBeEmpty();
         fakes.ManifestAppends.ShouldBeEmpty();
@@ -158,7 +158,7 @@ public sealed class TriagePipelineStateTests
     {
         var fakes = PipelineStateFakes.WithSuccessfulReplacement();
 
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineStateFakes.FilePath], new TriageOptions());
 
         fakes.LeaseAcquireCalls.ShouldBe(1);
     }
@@ -168,7 +168,7 @@ public sealed class TriagePipelineStateTests
     {
         var fakes = PipelineStateFakes.WithSuccessfulReplacement();
 
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions { DryRun = true });
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineStateFakes.FilePath], new TriageOptions { DryRun = true });
 
         fakes.LeaseAcquireCalls.ShouldBe(0);
     }
@@ -180,7 +180,7 @@ public sealed class TriagePipelineStateTests
         fakes.RecoveryUnrecoverableCount = 1;
 
         var ex = await Should.ThrowAsync<ReplacementRecoveryRequiredException>(
-            () => fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions()));
+            () => fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineStateFakes.FilePath], new TriageOptions()));
 
         ex.Entries.Count.ShouldBe(1);
         fakes.ProbeCalls.ShouldBe(0);
@@ -192,7 +192,7 @@ public sealed class TriagePipelineStateTests
         var fakes = PipelineStateFakes.WithSuccessfulReplacement();
         fakes.RecoveryUnrecoverableCount = 0; // no unrecoverable entries
 
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineStateFakes.FilePath], new TriageOptions());
 
         fakes.ProbeCalls.ShouldBe(1);
     }
@@ -204,7 +204,7 @@ public sealed class TriagePipelineStateTests
         fakes.RecoveryUnrecoverableCount = 1; // would fail if invoked
 
         // DryRun must skip recovery entirely — no exception should be thrown
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions { DryRun = true });
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineStateFakes.FilePath], new TriageOptions { DryRun = true });
 
         fakes.RecoveryCalls.ShouldBe(0);
     }
@@ -213,7 +213,7 @@ public sealed class TriagePipelineStateTests
     public async Task RunAsync_NonDryRun_SavesActiveRunBeforeEachFileAndClearsAfter()
     {
         var fakes = PipelineStateFakes.WithSuccessfulReplacement();
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions());
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineStateFakes.FilePath], new TriageOptions());
         fakes.ActiveRunSaves.ShouldNotBeEmpty();
         fakes.ActiveRunSaves.Last().CurrentFile.ShouldBe(PipelineStateFakes.FilePath);
         fakes.ActiveRunClears.ShouldBe(1);
@@ -223,7 +223,7 @@ public sealed class TriagePipelineStateTests
     public async Task RunAsync_DryRun_DoesNotSaveActiveRun()
     {
         var fakes = PipelineStateFakes.WithSuccessfulReplacement();
-        await fakes.Pipeline.RunAsync(@"C:\Videos", new TriageOptions { DryRun = true });
+        await fakes.Pipeline.RunAsync(@"C:\Videos", [PipelineStateFakes.FilePath], new TriageOptions { DryRun = true });
         fakes.ActiveRunSaves.ShouldBeEmpty();
     }
 
@@ -264,7 +264,6 @@ public sealed class TriagePipelineStateTests
         {
             Pipeline = new TriagePipeline(
                 _leaseFactory,
-                new FakeDiscovery(),
                 new FakeProbe(this),
                 new FakeClassifier(this),
                 new FakeEncoder(),
@@ -332,17 +331,6 @@ public sealed class TriagePipelineStateTests
             FileSizeBytes = SourceBytes,
             HasAudio = true
         };
-
-        private sealed class FakeDiscovery : IVideoFileDiscovery
-        {
-            public IEnumerable<string> EnumerateVideos(
-                string folderPath,
-                TriageOptions? options = null,
-                bool recursive = false,
-                IProgress<DiscoveryWarning>? warnings = null,
-                CancellationToken cancellationToken = default) =>
-                [FilePath];
-        }
 
         private sealed class FakeProbe(PipelineStateFakes f) : IFfprobeService
         {
