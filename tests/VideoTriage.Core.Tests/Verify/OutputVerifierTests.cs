@@ -329,7 +329,7 @@ public sealed class OutputVerifierTests : IDisposable
         runner.LastRequest!.FileName.ShouldBe(@"C:\tools\ffmpeg.exe");
         runner.LastRequest.Arguments.ShouldBe(
             ["-nostdin", "-v", "error", "-i", outputPath, "-f", "null", "-"]);
-        // Verifier now owns the path; StandardErrorPath must be set (not StderrDirectory)
+        // The verifier owns the path; StandardErrorPath must be set (not StderrDirectory)
         runner.LastRequest.StandardErrorPath.ShouldNotBeNull();
         runner.LastRequest.StderrDirectory.ShouldBeNull();
     }

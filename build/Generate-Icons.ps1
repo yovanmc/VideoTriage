@@ -137,14 +137,12 @@ function New-IcoBytes {
     return , $bytes
 }
 
-# ── Resolve paths ──────────────────────────────────────────────────────────────
 $repoRoot  = Split-Path $PSScriptRoot -Parent
 $appAssets = Join-Path $repoRoot 'src\VideoTriage.App\Assets'
 $pkgAssets = Join-Path $repoRoot 'src\VideoTriage.Package\Assets'
 New-Item -ItemType Directory -Force -Path $appAssets | Out-Null
 New-Item -ItemType Directory -Force -Path $pkgAssets | Out-Null
 
-# ── Build ICO ──────────────────────────────────────────────────────────────────
 $icoSizes  = @(16, 24, 32, 48, 256)
 $pngList   = [System.Collections.Generic.List[byte[]]]::new()
 foreach ($sz in $icoSizes) {
@@ -156,7 +154,6 @@ $icoPath = Join-Path $appAssets 'app.ico'
 [System.IO.File]::WriteAllBytes($icoPath, (New-IcoBytes -PngArrays $pngList.ToArray() -Sizes $icoSizes))
 Write-Output "Written: $icoPath ($($icoSizes -join ',') px)"
 
-# ── MSIX PNGs ─────────────────────────────────────────────────────────────────
 $msixAssets = [ordered]@{
     'Square44x44Logo.png'   = 44
     'StoreLogo.png'         = 50

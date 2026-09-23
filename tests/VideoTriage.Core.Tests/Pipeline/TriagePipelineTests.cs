@@ -114,7 +114,7 @@ public sealed class TriagePipelineTests
         result.Replaced.ShouldBe(1);
         fakes.Calls.ShouldBe(["probe", "classify", "space", "encode", "verify", "replace"]);
         fakes.OriginalRemoved.ShouldBeTrue();
-        // C3: savings must be computed, never left at defaults. Source 1000, output 500 => 500 bytes, 50%.
+        // Savings must be computed, never left at defaults. Source 1000, output 500 => 500 bytes, 50%.
         result.BytesSaved.ShouldBe(500);
         var file = result.Files.Single();
         file.OutputBytes.ShouldBe(500);

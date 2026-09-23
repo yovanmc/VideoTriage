@@ -18,7 +18,6 @@ public sealed class FfmpegThumbnailServiceTests
     [Fact]
     public async Task GetAsync_UsesResolvedFfmpegPathAndDeletesTemporaryPng()
     {
-        // Arrange
         var tempDir = Path.Combine(Path.GetTempPath(), $"vt_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
         try
@@ -41,11 +40,9 @@ public sealed class FfmpegThumbnailServiceTests
                 runner,
                 tempFileFactory: () => Path.Combine(tempDir, $"vt_thumb_{Guid.NewGuid():N}.png"));
 
-            // Act
             var bitmap = await OnStaAsync(() =>
                 service.GetAsync(@"C:\videos\test.mp4", 0, CancellationToken.None));
 
-            // Assert
             capturedFileName.ShouldBe(@"C:\tools\ffmpeg.exe");
             bitmap.ShouldNotBeNull();
             bitmap!.IsFrozen.ShouldBeTrue();
@@ -61,7 +58,6 @@ public sealed class FfmpegThumbnailServiceTests
     [Fact]
     public async Task GetAsync_MoreThanFourRequests_NeverRunsMoreThanFourProcesses()
     {
-        // Arrange
         var blockRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var runner = new FakeProcessRunner
         {
@@ -104,7 +100,6 @@ public sealed class FfmpegThumbnailServiceTests
     [Fact]
     public async Task GetAsync_Cancelled_KillsProcessAndDeletesTemporaryPng()
     {
-        // Arrange
         var tempDir = Path.Combine(Path.GetTempPath(), $"vt_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
         try
@@ -122,14 +117,12 @@ public sealed class FfmpegThumbnailServiceTests
 
             var cts = new CancellationTokenSource();
 
-            // Act
             var task = Task.Run(() => service.GetAsync(@"C:\videos\test.mp4", 0, cts.Token));
 
             // Wait for runner to start then cancel
             await runner.Started;
             cts.Cancel();
 
-            // Assert
             await Should.ThrowAsync<OperationCanceledException>(() => task);
             Directory.GetFiles(tempDir).ShouldBeEmpty();
         }
@@ -143,7 +136,7 @@ public sealed class FfmpegThumbnailServiceTests
     [Fact]
     public async Task GetAsync_VideoStream_DoesNotMapStream()
     {
-        // Arrange: a fake runner that records args and returns success (no output file → null result)
+        // A fake runner that records args and returns success (no output file, so a null result).
         ProcessRequest? captured = null;
         var runner = new FakeProcessRunner
         {
@@ -155,10 +148,8 @@ public sealed class FfmpegThumbnailServiceTests
         };
         var svc = new FfmpegThumbnailService("ffmpeg", runner, () => Path.Combine(Path.GetTempPath(), $"vt_thumb_{Guid.NewGuid():N}.png"));
 
-        // Act (result will be null because no file is written — that's fine)
         _ = await svc.GetAsync(@"C:\video.mp4", streamIndex: IThumbnailService.VideoStream, CancellationToken.None);
 
-        // Assert
         captured.ShouldNotBeNull();
         captured!.Arguments.ShouldNotContain("-map");
     }

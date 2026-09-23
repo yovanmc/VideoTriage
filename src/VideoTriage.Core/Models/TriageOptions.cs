@@ -21,7 +21,7 @@ public sealed record TriageOptions
     public double ResolutionTolerancePercent { get; init; } = 2;
     public bool RequireAudioParity { get; init; } = true;
 
-    // M4 pipeline policy.
+    // Pipeline policy.
     public DeleteMode DeleteMode { get; init; } = DeleteMode.RecycleBin;
     public double MinimumFreeGigabytes { get; init; } = 5;
     public double MarginalThresholdPercent { get; init; } = 10;
@@ -30,6 +30,6 @@ public sealed record TriageOptions
     public bool EmbedPoster { get; init; } = true;
     public double PosterTimestampPercent { get; init; } = 10;
 
-    // M5 state: per-folder data directory co-located with the scanned videos.
+    // State: per-folder data directory co-located with the scanned videos.
     public string DataDirectoryName { get; init; } = "_videotriage_data";
 }

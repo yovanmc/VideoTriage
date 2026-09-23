@@ -88,8 +88,6 @@ public sealed class VideoFileDiscoveryTests
             new VideoFileDiscovery().EnumerateVideos(missing).ToArray());
     }
 
-    // --- New tests using FakeDirectoryWalker ---
-
     [Fact]
     public void EnumerateVideos_Recursive_SkipsReparsePointDirectories()
     {

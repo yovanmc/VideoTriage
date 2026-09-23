@@ -4,7 +4,7 @@ namespace VideoTriage.Core.Replace;
 
 /// <summary>
 /// Crash-safe replacement of an original by a smaller, already-verified candidate. The only type
-/// permitted to request removal of an original (architecture contract §1.3).
+/// permitted to request removal of an original.
 /// </summary>
 public interface ISafeReplacer
 {
