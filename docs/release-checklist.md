@@ -68,8 +68,8 @@ Get-AppxPackage YovanMc.VideoTriage |
 - [ ] Confirm the original appears in the Recycle Bin.
 - [ ] Cancel one active encode and confirm the original remains untouched.
 - [ ] Confirm diagnostics are written under `%LocalAppData%\VideoTriage\Logs`.
-- [ ] Confirm state records are written under `%LocalAppData%\VideoTriage\Data`.
-- [ ] Confirm `.videotriage.partial.*` recovery instructions match the current implementation.
+- [ ] Confirm state records are written under `<selected folder>\_videotriage_data`.
+- [ ] Confirm `.videotriage.staging.*` recovery instructions match the current implementation.
 
 ## 6. Documentation And Visual Review
 
