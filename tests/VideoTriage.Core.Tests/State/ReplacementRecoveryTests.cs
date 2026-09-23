@@ -188,7 +188,6 @@ public sealed class ReplacementRecoveryTests
             public bool FileExists(string path) => f.ExistingFiles.Contains(path);
             public long GetFileLength(string path) => 500;
             public void CreateDirectory(string path) { }
-            public void CopyFile(string src, string dst, bool overwrite) { }
             public void MoveFile(string src, string dst) => f.Moves.Add((src, dst));
             public void DeleteFile(string path) => f.Deletes.Add(path);
             public long GetAvailableFreeSpace(string path) => long.MaxValue;

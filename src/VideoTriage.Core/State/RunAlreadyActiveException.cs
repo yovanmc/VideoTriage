@@ -7,7 +7,4 @@ public sealed class RunAlreadyActiveException(string dataDirectory, Exception? i
     : InvalidOperationException(
         $"A VideoTriage run is already active in '{dataDirectory}'. " +
         "Wait for it to complete or remove the run.lock file if the previous run crashed.",
-        innerException)
-{
-    public string DataDirectory { get; } = dataDirectory;
-}
+        innerException);
