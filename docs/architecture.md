@@ -36,13 +36,14 @@ flowchart TD
     Verify --> Poster["Optionally extract and embed poster"]
     Poster --> Reverify["Re-verify poster-bearing candidate"]
     Reverify --> Size["Require non-empty and strictly smaller output"]
-    Size --> Stage["Stage replacement beside original"]
+    Size --> Stage["Journal and stage replacement beside original"]
     Stage --> Remove["Remove original through FileRemover"]
     Remove --> Rename["Rename staging file to final path"]
     Rename --> State["Append completed state, deletion manifest, and result log"]
 ```
 
-Only `SafeReplacer` may request original removal. Only `FileRemover` may invoke permanent-delete
+Only `ReplacementTransactionCoordinator` (or `SafeReplacer` when no coordinator is configured) may
+request original removal. Only `FileRemover` may invoke permanent-delete
 or Recycle Bin APIs for an original; other deletion calls are limited to temporary working files.
 Poster embedding creates a new candidate, reuses the output verifier, and cannot bypass
 verification.
@@ -55,6 +56,9 @@ verification.
 | Completed-file state | `<scanned folder>\_videotriage_data\completed.jsonl` | JSON Lines |
 | Per-file result records | `<scanned folder>\_videotriage_data\results.jsonl` | JSON Lines |
 | Original-removal manifest | `<scanned folder>\_videotriage_data\deletions.csv` | Quoted CSV with a header |
+| Replacement journal | `<scanned folder>\_videotriage_data\replacement-journal.jsonl` | JSON Lines |
+| Active run state | `<scanned folder>\_videotriage_data\active-run.json` | JSON |
+| Run lock | `<scanned folder>\_videotriage_data\run.lock` | Exclusive file lock |
 | Diagnostic logs | `%LocalAppData%\VideoTriage\Logs\videotriage-YYYYMMDD.log` | Daily rolling text logs |
 
 The data directory name defaults to `_videotriage_data` and is configurable through

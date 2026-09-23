@@ -104,7 +104,7 @@ public sealed class MainViewModelScanTests
     [Fact]
     public async Task AfterScan_QueueRemainingCount_EqualsCandidateRows()
     {
-        // Regression (bug 1c): the queue count must equal the number of candidate
+        // The queue count must equal the number of candidate
         // rows actually added — not be set before the last row lands.
         var scanner = new FakeFolderProbeScanner();
         scanner.Results.Add(Result(@"C:\videos\a.mp4"));

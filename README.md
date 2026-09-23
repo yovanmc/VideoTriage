@@ -21,7 +21,9 @@ protects the original.
 - Recycle Bin is the default deletion mode.
 - Pause, cancellation, tool failure, verification failure, low disk space, and pre-removal
   exceptions leave the original untouched.
-- A failed final rename preserves the verified replacement as `.videotriage.partial.*.mp4`.
+- A failed final rename preserves the verified replacement as `.videotriage.staging.*.mp4`.
+- Every replacement step is journaled, and the next run of that folder recovers an interrupted
+  replacement before processing anything else.
 
 Read the full [safety model](docs/safety.md).
 

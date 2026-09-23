@@ -19,11 +19,12 @@ For each candidate, the pipeline completes these steps in order:
    discarded and the already verified encode remains the replacement candidate.
 6. The final candidate must still be strictly smaller than the original. An equal-size or larger
    result is discarded.
-7. `SafeReplacer` moves the verified candidate to a distinct, same-directory staging path. The
-   staging path is not the encoder output path.
-8. `SafeReplacer` confirms that staging exists and has the expected byte length.
+7. `ReplacementTransactionCoordinator` confirms that the original and the verified candidate both
+   exist, records a `Prepared` entry in the replacement journal, and moves the candidate to a
+   distinct, same-directory staging path. The staging path is not the encoder output path.
 
-Only after all eight gates pass does `SafeReplacer` ask `FileRemover` to remove the original.
+Only after all seven gates pass does `ReplacementTransactionCoordinator` ask `FileRemover` to
+remove the original.
 
 ## Failure Guarantees And Run Controls
 
@@ -35,7 +36,7 @@ Only after all eight gates pass does `SafeReplacer` ask `FileRemover` to remove 
   already verified encode, which may still proceed through the size, staging, and removal gates.
 - Exceptions before `FileRemover` is called leave the original untouched. Temporary artifacts can
   remain after exceptional paths and are excluded from later discovery.
-- Pause is cooperative and is currently checked once, immediately after each file is discovered.
+- Pause is cooperative and is checked once, immediately before each queued file is processed.
   It prevents that file from proceeding until Resume, but it does not suspend a file that is
   already probing, encoding, verifying, embedding a poster, or replacing.
 - Stop requests cancellation and takes effect at the next cancellation boundary. Cancellation-aware
@@ -44,26 +45,30 @@ Only after all eight gates pass does `SafeReplacer` ask `FileRemover` to remove 
   files have dedicated cleanup, and the pipeline removes an encode temp when cancellation
   propagates through its protected processing block. Other interrupted or failed paths can leave
   temporary files.
-- Once the synchronous `SafeReplacer` replacement has begun, Stop cannot interrupt it. The file may
+- Once the synchronous replacement transaction has begun, Stop cannot interrupt it. The file may
   finish as a completed replacement, a `ReplacePartial`, or an exception requiring manual
   inspection. Cancellation does not roll back replacements completed earlier in the run, so review
   completion and partial outcomes before retrying.
 
 ## Partial Replacement Recovery
 
-After removal, `SafeReplacer` renames staging to the canonical `.mp4` path. If original removal
-succeeds but that final rename fails with an I/O or access error, VideoTriage attempts to preserve
-the verified staging replacement as:
+After removal, the coordinator records `OriginalRemoved` in the journal, renames staging to the
+canonical `.mp4` path, and records `Committed`. If that final rename fails with an I/O or access
+error, the verified replacement stays at its staging path:
 
-`<base-name>.videotriage.partial.<process-id>.mp4`
+`<base-name>.videotriage.staging.<transaction-id>.mp4`
 
-For example, `clip.mov` becomes `clip.videotriage.partial.<process-id>.mp4`. When that fallback
-rename succeeds, the result is `ReplacePartial` with `OriginalRemoved` set to `true`; this is a
-recoverable partial outcome, not a claim that the original still exists. If the fallback rename
-also fails, the operation throws and the verified replacement may remain at its
-`.videotriage.staging.<process-id>.mp4` path, requiring manual inspection. Follow
-[Install VideoTriage](installation.md#recover-a-partial-replacement) to inspect and recover a
-successfully preserved partial file.
+For example, `clip.mov` leaves `clip.videotriage.staging.<transaction-id>.mp4`. The journal records
+`Partial` and the result is `ReplacePartial` with `OriginalRemoved` set to `true`. This is a
+recoverable partial outcome, not a claim that the original still exists. Follow
+[Install VideoTriage](installation.md#recover-a-partial-replacement) to inspect and recover the
+preserved file.
+
+A crash can also interrupt a transaction between journal entries. Before each non-dry run, the
+pipeline replays the folder's journal. When the original and staging both exist, staging is
+deleted. When the original is gone and staging exists, staging is moved to the intended final path
+(or left at staging if that path is taken) and the deletion manifest is repaired. Any other state
+stops the run with a recovery-required error for manual inspection.
 
 ## Deletion Modes
 
@@ -91,6 +96,9 @@ Each non-dry run creates state under the selected folder at
 - `results.jsonl` records terminal per-file results.
 - `deletions.csv` receives a deletion record only when the replacement result reports
   `OriginalRemoved` as `true`.
+- `replacement-journal.jsonl` records each replacement transaction phase for crash recovery.
+- `active-run.json` records the in-progress run and is cleared when a run finishes normally.
+- `run.lock` is held exclusively while a run is active, so two runs cannot share a folder.
 
 Application diagnostics are written under `%LocalAppData%\VideoTriage\Logs`. State and audit writes
 happen after replacement outcomes are known; a logging or bookkeeping concern never weakens the

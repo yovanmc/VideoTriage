@@ -110,7 +110,7 @@ public sealed class SafeReplacerTests
         fs.Operations.ShouldNotContain(op => op.StartsWith("remove:"));
     }
 
-    // REGRESSION (critical): the pipeline encodes to EncodePath(source, txId) and passes that exact
+    // The pipeline encodes to EncodePath(source, txId) and passes that exact
     // path as the candidate. Staging must NOT reuse EncodePath, or the move becomes x -> x and throws.
     [Fact]
     public void Replace_CandidateIsEncodeTempForSameSourceAndTxId_SucceedsWithoutSelfCollision()

@@ -73,7 +73,8 @@ delete, or write completed-file state.
 
 ## State And Logs
 
-Each non-dry run stores its completed-file state, result log, and deletion manifest under
+Each non-dry run stores its completed-file state, result log, deletion manifest, and replacement
+journal under
 `<selected folder>\_videotriage_data` by default. The folder name can be changed in application
 options.
 
@@ -82,22 +83,24 @@ settings are under `%LocalAppData%\VideoTriage`.
 
 ## Recover A Partial Replacement
 
-A file named like `clip.videotriage.partial.1234.mp4` means the verified replacement was preserved
-after the original had already been removed but the final rename failed.
+A file named like `clip.videotriage.staging.9f1c2d3e4a5b6c7d8e9f0a1b2c3d4e5f.mp4` that remains
+after a run ends means the verified replacement was preserved after the original had already been
+removed but the final rename failed. Interrupted replacements from a crash are recovered automatically on the next run of
+that folder.
 
 1. Stop VideoTriage.
-2. Do not delete the `.videotriage.partial.*` file.
+2. Do not delete the `.videotriage.staging.*` file.
 3. Confirm the file is non-empty:
 
    ```powershell
-   Get-Item .\clip.videotriage.partial.1234.mp4 | Select-Object FullName, Length
+   Get-Item .\clip.videotriage.staging.9f1c2d3e4a5b6c7d8e9f0a1b2c3d4e5f.mp4 | Select-Object FullName, Length
    ```
 
 4. Verify it with ffprobe and a full decode:
 
    ```powershell
-   ffprobe -v error -show_format -show_streams .\clip.videotriage.partial.1234.mp4
-   ffmpeg -nostdin -v error -i .\clip.videotriage.partial.1234.mp4 -f null -
+   ffprobe -v error -show_format -show_streams .\clip.videotriage.staging.9f1c2d3e4a5b6c7d8e9f0a1b2c3d4e5f.mp4
+   ffmpeg -nostdin -v error -i .\clip.videotriage.staging.9f1c2d3e4a5b6c7d8e9f0a1b2c3d4e5f.mp4 -f null -
    ```
 
 5. If ffprobe reports a video stream and ffmpeg prints no real decode errors, rename it to the
@@ -105,7 +108,7 @@ after the original had already been removed but the final rename failed.
 
    ```powershell
    Rename-Item `
-     .\clip.videotriage.partial.1234.mp4 `
+     .\clip.videotriage.staging.9f1c2d3e4a5b6c7d8e9f0a1b2c3d4e5f.mp4 `
      .\clip.mp4
    ```
 

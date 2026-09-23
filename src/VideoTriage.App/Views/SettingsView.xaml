@@ -57,6 +57,5 @@
                 </Style>
             </TextBlock.Style>
         </TextBlock>
-        <!-- Recursive toggle deferred to Phase 3 (Queue UX plan) -->
     </StackPanel>
 </UserControl>

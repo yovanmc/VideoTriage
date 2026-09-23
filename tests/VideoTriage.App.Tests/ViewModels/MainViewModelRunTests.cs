@@ -288,7 +288,7 @@ public sealed class MainViewModelRunTests
     [Fact]
     public async Task Summary_KeepsThumbnailForEveryProcessedFile_AfterReorderMoves()
     {
-        // Regression: the queue reorders rows during a run (float-to-top / sink-to-bottom via
+        // The queue reorders rows during a run (float-to-top / sink-to-bottom via
         // Items.Move). A Move raises CollectionChanged with the row in BOTH OldItems and NewItems;
         // if the index handler adds-then-removes, moved rows fall out of the queue index and the
         // summary loses their thumbnails — only the never-moved row keeps one.

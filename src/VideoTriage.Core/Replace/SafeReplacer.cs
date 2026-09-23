@@ -6,7 +6,7 @@ namespace VideoTriage.Core.Replace;
 /// <summary>
 /// Replaces an original with a smaller, already-verified candidate using a crash-safe ordering:
 /// the verified bytes are placed and size-checked at a staging path BEFORE the original is removed,
-/// so an interruption can never destroy the only copy. See architecture contract §7.
+/// so an interruption can never destroy the only copy.
 /// </summary>
 public sealed class SafeReplacer(
     IFileSystem fileSystem,

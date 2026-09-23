@@ -122,8 +122,6 @@ public sealed class ReplacementTransactionCoordinatorTests
         fakes.Moves.ShouldBeEmpty();
     }
 
-    // --- Fakes ---
-
     private sealed class CoordinatorFakes
     {
         public bool ThrowOnRemove { get; set; }

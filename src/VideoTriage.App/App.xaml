@@ -7,7 +7,6 @@
             <ResourceDictionary.MergedDictionaries>
                 <ui:ThemesDictionary Theme="Dark" />
                 <ui:ControlsDictionary />
-                <!-- Shared design tokens (color/surface/radius/spacing/type). -->
                 <ResourceDictionary Source="/VideoTriage.App;component/Resources/DesignTokens.xaml" />
             </ResourceDictionary.MergedDictionaries>
 

@@ -157,8 +157,6 @@ public sealed class ReplacementRecoveryTests
         report.Unrecoverable.ShouldBeEmpty();
     }
 
-    // --- Fakes ---
-
     private sealed class RecoveryFakes
     {
         public HashSet<string> ExistingFiles { get; } = [];
