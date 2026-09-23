@@ -168,12 +168,6 @@ public sealed class SafeReplacerTests
 
         public void CreateDirectory(string path) { }
 
-        public void CopyFile(string sourcePath, string destinationPath, bool overwrite)
-        {
-            Operations.Add($"copy:{sourcePath}->{destinationPath}");
-            _files[destinationPath] = _files[sourcePath];
-        }
-
         public void MoveFile(string sourcePath, string destinationPath)
         {
             if (string.Equals(sourcePath, destinationPath, StringComparison.OrdinalIgnoreCase))

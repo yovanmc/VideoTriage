@@ -390,7 +390,6 @@ public sealed class TriagePipelineTests
                 f.CreatedFiles.Contains(path) && !_deleted.Contains(path);
             public long GetFileLength(string path) => f.OutputBytes;
             public void CreateDirectory(string path) { }
-            public void CopyFile(string sourcePath, string destinationPath, bool overwrite) { }
             public void MoveFile(string sourcePath, string destinationPath) { }
             public void DeleteFile(string path)
             {

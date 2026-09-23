@@ -157,7 +157,6 @@ public sealed class ReplacementTransactionCoordinatorTests
             public bool FileExists(string path) => !f.MissingFiles.Contains(path);
             public long GetFileLength(string path) => path.Contains(".staging.") ? 500 : 1000;
             public void CreateDirectory(string path) { }
-            public void CopyFile(string src, string dst, bool overwrite) { }
             public void MoveFile(string src, string dst)
             {
                 if (f.ThrowOnMoveToFinal && dst.EndsWith(".mp4") && !dst.Contains(".staging.") && !dst.Contains(".tmp."))

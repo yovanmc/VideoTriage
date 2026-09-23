@@ -384,7 +384,6 @@ public sealed class TriagePipelineStateTests
             public bool FileExists(string path) => true;
             public long GetFileLength(string path) => TempFileNaming.IsTempArtifact(path) ? f.OutputBytes : f.SourceBytes;
             public void CreateDirectory(string path) => f.CreatedDirectories.Add(path);
-            public void CopyFile(string sourcePath, string destinationPath, bool overwrite) { }
             public void MoveFile(string sourcePath, string destinationPath) { }
             public void DeleteFile(string path) { }
             public long GetAvailableFreeSpace(string path) => long.MaxValue;
